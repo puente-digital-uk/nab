@@ -97,7 +97,7 @@ jobs:
 
           Built from this tag by GitHub Actions ([the run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})), so the binary matches the public source. Provenance is attested: \`gh attestation verify nab.exe --owner puente-digital-uk\` proves it came from this workflow and commit.
           EOF
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: Nab ${{ github.ref_name }}${{ startsWith(github.ref_name, 'v0.') && ' (beta)' || '' }}
           prerelease: ${{ startsWith(github.ref_name, 'v0.') }} # every 0.x release is a beta
