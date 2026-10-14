@@ -419,19 +419,18 @@ mod smoke {
         let _serial = serial();
         unsafe {
             let host = create_host().unwrap();
-            // One big plain window with the text in its top-left corner. Every point this test
-            // clicks is derived from that window, so a "blank" click is always inside it, far from
-            // the text, and never on whatever else happens to be on the desktop (on a CI runner
-            // that is the console log, which must not get merged into the block we read).
-            let (x, y) = (80, 80);
-            let w = (GetSystemMetrics(SM_CXSCREEN) - 2 * x).min(1400);
-            let h = (GetSystemMetrics(SM_CYSCREEN) - 2 * y).min(600);
-            assert!(w >= 700 && h >= 300, "the screen is too small for this test: {w}x{h}");
+            // A plain window covering the whole virtual screen, with the text in its top-left
+            // corner. Nothing else can be in the captured image, so a click far from the text is
+            // blank by construction, whatever the desktop (or the console this test runs in)
+            // happens to be showing, at any resolution or scaling.
+            let (x, y) = (GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN));
+            let (w, h) = (GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+            assert!(w >= 800 && h >= 600, "the screen is too small for this test: {w}x{h}");
             let (win, font) = show_text("Quarterly revenue grew twelve percent", x, y, w, h);
             let _ = sys::set_clipboard("sentinel", None);
 
             // Exactly what the mouse shortcut does: press and release at the same screen point,
-            // on the text itself (the first couple of words, a line of 34px type at the top).
+            // on the text itself (one line of 34px type along the top).
             capture::mouse_down(x + 160, y + 20);
             assert!(capture::is_open());
             capture::mouse_up(x + 160, y + 20);
@@ -439,14 +438,16 @@ mod smoke {
             assert!(ok, "clipboard was {:?}; {}", clipboard(), diagnose());
             assert!(pump_until(3, || !capture::is_open()), "overlay should close after the green flash");
 
-            // Clicking blank space (mouse shortcut) closes without touching the clipboard.
-            let (bx, by) = (x + w - 80, y + h - 80);
+            // Clicking blank space (mouse shortcut) closes without touching the clipboard. Give the
+            // desktop a moment first, so the capture can't catch a frame of the overlay just closed.
+            let (bx, by) = (x + w / 2, y + h - 150);
             let _ = sys::set_clipboard("sentinel", None);
+            pump_until(1, || false);
             capture::mouse_down(bx, by);
             capture::mouse_up(bx, by);
             assert!(pump_until(20, || !capture::is_open()), "a click on nothing should close the overlay");
             pump_until(1, || false);
-            assert_eq!(clipboard(), "sentinel", "a click on blank space at ({bx}, {by}) copied something; {}", diagnose());
+            assert_eq!(clipboard(), "sentinel", "a click on blank space at ({bx}, {by}) of {w}x{h} copied something; {}", diagnose());
 
             // Dragging with the mouse shortcut still reads a box: from just outside the text's
             // top-left corner to below and right of it, as people do.
