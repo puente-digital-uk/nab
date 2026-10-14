@@ -399,31 +399,34 @@ mod smoke {
         let _serial = serial();
         unsafe {
             let host = create_host().unwrap();
-            let (win, font) = show_text("Quarterly revenue grew twelve percent", 120, 140, 900, 120);
+            // A big white window with the text in its top-left corner, so a "blank" click near the
+            // bottom-right is hundreds of pixels from any text, ours or whatever the desktop behind
+            // it shows (on a CI runner that's the console log, which must not get merged in).
+            let (win, font) = show_text("Quarterly revenue grew twelve percent", 100, 100, 1400, 600);
             let _ = sys::set_clipboard("sentinel", None);
 
             // Exactly what the mouse shortcut does: press and release at the same screen point.
-            capture::mouse_down(260, 175);
+            capture::mouse_down(260, 120);
             assert!(capture::is_open());
-            capture::mouse_up(260, 175);
+            capture::mouse_up(260, 120);
             let ok = pump_until(20, || norm(&clipboard()) == "quarterlyrevenuegrewtwelvepercent");
             assert!(ok, "clipboard was {:?}; {}", clipboard(), diagnose());
             assert!(pump_until(3, || !capture::is_open()), "overlay should close after the green flash");
 
             // Clicking on blank space (mouse shortcut) closes without touching the clipboard.
             let _ = sys::set_clipboard("sentinel", None);
-            capture::mouse_down(980, 250);
-            capture::mouse_up(980, 250);
+            capture::mouse_down(1300, 600);
+            capture::mouse_up(1300, 600);
             assert!(pump_until(20, || !capture::is_open()), "a click on nothing should close the overlay");
             pump_until(1, || false);
-            assert_eq!(clipboard(), "sentinel");
+            assert_eq!(clipboard(), "sentinel", "{}", diagnose());
 
             // Dragging with the mouse shortcut still reads a box.
-            capture::mouse_down(105, 130); // a little outside the text, as people do
+            capture::mouse_down(110, 108); // a little outside the text, as people do
             for i in 1..10 {
-                SendMessageW(FindWindowW(w!("NabOverlay"), None).unwrap(), WM_MOUSEMOVE, WPARAM(0), at(i * 80, i * 10));
+                SendMessageW(FindWindowW(w!("NabOverlay"), None).unwrap(), WM_MOUSEMOVE, WPARAM(0), at(110 + i * 100, 108 + i * 12));
             }
-            capture::mouse_up(1015, 255);
+            capture::mouse_up(1100, 240);
             assert!(!capture::is_open(), "a drag closes straight away");
             let ok = pump_until(20, || norm(&clipboard()).contains("quarterlyrevenue"));
             assert!(ok, "clipboard was {:?}; {}", clipboard(), diagnose());
