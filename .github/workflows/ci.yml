@@ -4,13 +4,27 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  schedule:
+    - cron: "23 6 * * 1" # weekly: advisories appear without any code changing
 
 permissions:
   contents: read
 
+# The jobs run one after another, cheapest first, so a problem is reported in seconds
+# rather than minutes and nothing else is started after a failure.
 jobs:
+  deps:
+    name: Dependency advisories, licences, sources # ~40s
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          command: check advisories bans licenses sources
+
   build:
-    name: Lint, test, build
+    name: Lint, test, build # ~3 min
+    needs: deps
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -57,14 +71,31 @@ jobs:
           name: nab-${{ github.sha }}
           path: dist/
 
+  codeql:
+    name: CodeQL (Rust) # ~4.5 min
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: github/codeql-action/init@9f759ee644a3e7c15c1390abf49868036c00067b # v3
+        with:
+          languages: rust
+          build-mode: none
+      - uses: github/codeql-action/analyze@9f759ee644a3e7c15c1390abf49868036c00067b # v3
+        with:
+          category: codeql-rust
+
   release:
     name: Publish the GitHub release
-    needs: build
+    needs: [build, codeql] # everything has to be green before anything is published
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write     # build provenance attestation
+      id-token: write # build provenance attestation
       attestations: write
     env:
       VT_API_KEY: ${{ secrets.VT_API_KEY }} # optional: a free VirusTotal key; see SECURITY.md

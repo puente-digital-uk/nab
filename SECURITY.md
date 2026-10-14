@@ -12,8 +12,8 @@ Nab reads your screen and writes to your clipboard, so we take reports seriously
 
 ## What's checked, automatically
 
-- **Every push and every week:** [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) checks the dependency tree against the RustSec advisory database, allowed licences and allowed sources (crates.io only). Nab has one runtime dependency, Microsoft's `windows` crate, pinned with checksums in `Cargo.lock`; CI builds with `--locked`.
-- **Every push:** GitHub CodeQL analyses the Rust code; findings appear under the repo's Security tab.
+- **Every push and every week,** before anything else runs: [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) checks the dependency tree against the RustSec advisory database, allowed licences and allowed sources (crates.io only). Nab has one runtime dependency, Microsoft's `windows` crate, pinned with checksums in `Cargo.lock`; CI builds with `--locked`.
+- **Every push,** once the build and tests are green: GitHub CodeQL analyses the Rust code; findings appear under the repo's Security tab.
 - **Weekly:** [OpenSSF Scorecard](https://securityscorecards.dev/) rates the repository's practices (pinned dependencies, branch protection, token permissions …); the badge is in the README.
 - **Dependabot** opens pull requests for crate and GitHub Actions updates.
 - **Every release:** the exact `nab.exe` is scanned by [VirusTotal](https://www.virustotal.com/) (≈70 antivirus engines) and the result link is written into the release notes, so you can see the verdict for the file you're downloading. (Maintainers: this needs a free VirusTotal API key in the repository secret `VT_API_KEY`; the step is skipped without it.)

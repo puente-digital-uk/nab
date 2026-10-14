@@ -11,7 +11,6 @@
 
 <p align="center">
   <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="../../actions/workflows/security.yml"><img src="../../actions/workflows/security.yml/badge.svg" alt="Security checks"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/puente-digital-uk/nab"><img src="https://api.scorecard.dev/projects/github.com/puente-digital-uk/nab/badge" alt="OpenSSF Scorecard"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="MIT licence"></a>
 </p>
