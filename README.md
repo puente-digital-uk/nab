@@ -11,6 +11,8 @@
 
 <p align="center">
   <a href="../../actions/workflows/ci.yml"><img src="../../actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="../../actions/workflows/security.yml"><img src="../../actions/workflows/security.yml/badge.svg" alt="Security checks"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/puente-digital-uk/nab"><img src="https://api.scorecard.dev/projects/github.com/puente-digital-uk/nab/badge" alt="OpenSSF Scorecard"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="MIT licence"></a>
 </p>
 
@@ -68,6 +70,10 @@ Open Nab (click the tray icon), press **Change** next to a shortcut, then:
 Press **Delete** to turn a shortcut off, or **Esc** to cancel. Your choice is saved. Tick **Start with Windows** to always have it handy.
 
 > The mouse shortcut takes over that click everywhere while Nab runs. If an app you use needs Ctrl+Shift+click (some browsers use it to open a link in a new tab), pick something else, such as Ctrl+Alt+click or Ctrl+middle click.
+
+## Safe to run
+
+Nab reads your screen and writes to your clipboard, so it's held to a higher bar than a toy. Every push is checked by cargo-deny (dependency advisories and licences), GitHub CodeQL and OpenSSF Scorecard; every release's `nab.exe` is scanned by VirusTotal with the result linked in the release notes, and its SHA-256 is published alongside it. The exe is built from the tagged source by GitHub Actions, with Control Flow Guard and a statically linked runtime, and it has no network code at all. Details, and how to report a problem, in [SECURITY.md](SECURITY.md).
 
 ## Private
 

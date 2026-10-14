@@ -18,7 +18,7 @@ pub fn selection(a: (i32, i32), b: (i32, i32), sw: i32, sh: i32) -> Option<(u32,
 /// Turn a BGRA buffer into opaque greys (Rec. 601 luma). ClearType draws text with coloured
 /// sub-pixel fringes, which OCR reads worse than plain grey edges; GDI also leaves alpha undefined.
 pub fn greyscale(bgra: &mut [u8]) {
-    for px in bgra.chunks_exact_mut(4) {
+    for px in bgra.as_chunks_mut::<4>().0 {
         let y = ((px[2] as u32 * 299 + px[1] as u32 * 587 + px[0] as u32 * 114 + 500) / 1000) as u8;
         px[0] = y;
         px[1] = y;

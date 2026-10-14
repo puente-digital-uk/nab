@@ -423,7 +423,7 @@ mod tests {
 
     fn map(img: Img, f: impl Fn(u8) -> u8) -> Img {
         let (mut px, w, h) = img;
-        for p in px.chunks_exact_mut(4) {
+        for p in px.as_chunks_mut::<4>().0 {
             let v = f(p[0]);
             p[..3].copy_from_slice(&[v, v, v]);
         }

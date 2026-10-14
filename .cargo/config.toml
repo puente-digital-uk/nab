@@ -1,0 +1,5 @@
+# Hardening for the shipped exe (both are no-ops for the tests and on other targets):
+# - control-flow-guard: Windows CFG, so a corrupted function pointer can't be made to jump anywhere.
+# - crt-static: link the C runtime in, so nab.exe needs no vcruntime140.dll (no "runtime" to install).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "control-flow-guard", "-C", "target-feature=+crt-static"]

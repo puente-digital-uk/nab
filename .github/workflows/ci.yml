@@ -14,8 +14,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master # the version comes from rust-toolchain.toml
         with:
+          toolchain: 1.97.0
           components: clippy
       - name: Lint
         run: cargo clippy --locked --all-targets -- -D warnings
@@ -57,20 +58,36 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      VT_API_KEY: ${{ secrets.VT_API_KEY }} # optional: a free VirusTotal key; see SECURITY.md
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: nab-${{ github.sha }}
           path: dist
+      - name: Scan the exe with VirusTotal
+        id: vt
+        if: env.VT_API_KEY != ''
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          files: dist/nab.exe
       - name: Write the release notes
+        env:
+          VT_ANALYSIS: ${{ steps.vt.outputs.analysis }}
         run: |
           sum=$(cut -d' ' -f1 dist/SHA256SUMS.txt)
+          vt=""
+          if [ -n "$VT_ANALYSIS" ]; then
+            url=$(printf '%s' "$VT_ANALYSIS" | tr ',' '\n' | grep '^dist/nab.exe=' | cut -d= -f2-)
+            [ -n "$url" ] && vt="VirusTotal scan of this exact file: $url"
+          fi
           cat > notes.md <<EOF
           **Download \`nab.exe\` and run it.** No installer, nothing else to install. It sits in the tray: hold **Ctrl+Shift** and click on any text to copy it, or drag a box.
 
           Windows SmartScreen may say it "prevented an unrecognised app from starting" because this build isn't code-signed yet. Click **More info → Run anyway**. The Microsoft Store version is signed by Microsoft and shows no warning.
 
-          SHA-256 of \`nab.exe\`: \`$sum\` — check it with \`Get-FileHash nab.exe\` in PowerShell.
+          SHA-256 of \`nab.exe\`: \`$sum\` — check it with \`Get-FileHash nab.exe\` in PowerShell. $vt
 
           Built from this tag by GitHub Actions ([the run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})), so the binary matches the public source.
           EOF

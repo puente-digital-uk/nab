@@ -1,5 +1,4 @@
 /target
-/.cargo
 *.zip
 /dist
 /msix/.pkg

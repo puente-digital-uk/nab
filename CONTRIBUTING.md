@@ -17,6 +17,10 @@ Thanks for looking. Nab is small on purpose, so the bar for new features is "doe
 - **Tests never touch the real settings**: they use the `…\Nab-tests` registry key and the `Nab-tests` Run value.
 - British English in anything the user sees.
 
+## Toolchain
+
+`rust-toolchain.toml` pins the Rust version; rustup installs it the first time you build. CI uses the same one, so a lint that is new in a newer Rust can't break the build unannounced. Bump it deliberately, in its own commit, together with whatever the newer clippy asks for.
+
 ## Checks
 
 ```powershell

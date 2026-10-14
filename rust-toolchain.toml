@@ -1,0 +1,5 @@
+# One toolchain everywhere (CI, every PC): clippy -D warnings means a new lint in a new Rust must
+# not break the build out of the blue. Bump this on purpose, with the fixes, in its own commit.
+[toolchain]
+channel = "1.97.0"
+components = ["clippy"]
