@@ -37,13 +37,14 @@ const LINK: (COLORREF, COLORREF) = (rgb(0x5E, 0xEA, 0xD4), rgb(0x99, 0xF6, 0xE4)
 enum Hit {
     ChangeMouse,
     ChangeKey,
+    Info, // the ⓘ next to "Time saved": hovering it explains the counter
     Grab,
     Coffee,
     Autostart,
     Site,
     Source,
 }
-const HITS: [Hit; 7] = [Hit::ChangeMouse, Hit::ChangeKey, Hit::Grab, Hit::Coffee, Hit::Autostart, Hit::Site, Hit::Source];
+const HITS: [Hit; 8] = [Hit::ChangeMouse, Hit::ChangeKey, Hit::Info, Hit::Grab, Hit::Coffee, Hit::Autostart, Hit::Site, Hit::Source];
 
 /// Which shortcut the user is currently choosing.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -69,6 +70,7 @@ fn area(h: Hit) -> (i32, i32, i32, i32) {
     match h {
         Hit::ChangeMouse => (332, 118, 396, 150),
         Hit::ChangeKey => (332, 170, 396, 202),
+        Hit::Info => (128, 264, 146, 282),
         Hit::Grab => (32, 346, 408, 390),
         Hit::Autostart => (32, 408, 240, 430),
         Hit::Coffee => (268, 404, 408, 434), // small, out of the way of the main button
@@ -207,6 +209,7 @@ fn act(hwnd: HWND, h: Hit) {
             let _ = ShowWindow(hwnd, SW_HIDE);
             let _ = SetTimer(crate::host(), crate::TIMER_GRAB, 250, None);
         },
+        Hit::Info => {} // hover does the work
         Hit::Coffee => sys::open(crate::COFFEE),
         Hit::Site => sys::open(crate::SITE),
         Hit::Source => sys::open(crate::REPO),
@@ -263,7 +266,7 @@ extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT
                 set_hover(hit_test(dpi, lp));
             }
             WM_MOUSELEAVE => set_hover(None),
-            WM_SETCURSOR if hover.is_some() && (lp.0 & 0xffff) as u32 == HTCLIENT => {
+            WM_SETCURSOR if hover.is_some_and(|h| h != Hit::Info) && (lp.0 & 0xffff) as u32 == HTCLIENT => {
                 SetCursor(LoadCursorW(None, IDC_HAND).unwrap_or_default());
                 return LRESULT(1);
             }
@@ -472,8 +475,12 @@ unsafe fn paint(hwnd: HWND, hdc: HDC, dpi: i32, hover: Option<Hit>, rec: Option<
     let saved = sys::saved();
     fill(dc, r(32, 258, 408, 330), CARD, s(14), Some(LINE));
     text(dc, "TIME SAVED", s(11), 700, MUTED, r(50, 266, 220, 282), DT_LEFT);
+    let info = scaled(dpi, area(Hit::Info));
+    let info_colour = if hover == Some(Hit::Info) { LINK.1 } else { MUTED };
+    fill(dc, info, CARD, s(18), Some(info_colour));
+    text(dc, "i", s(11), 700, info_colour, info, DT_CENTER);
     text(dc, &crate::logic::format_saved(saved.seconds), s(22), 700, TEXT, r(50, 282, 230, 310), DT_LEFT);
-    text(dc, "vs screenshot → OCR/AI tool → copy back: ~20 s a time, ~1 min for a table", s(11), 400, MUTED, r(50, 310, 392, 326), DT_LEFT);
+    text(dc, "vs screenshot → OCR/AI tool → copy back", s(11), 400, MUTED, r(50, 310, 300, 326), DT_LEFT);
     let (nabs, keys) = match saved.nabs {
         0 => ("Nab something".to_string(), "to start the clock".to_string()),
         n => (
@@ -483,6 +490,22 @@ unsafe fn paint(hwnd: HWND, hdc: HDC, dpi: i32, hover: Option<Hit>, rec: Option<
     };
     text(dc, &nabs, s(14), 600, TEXT, r(220, 264, 392, 286), DT_RIGHT);
     text(dc, &keys, s(13), 400, MUTED, r(200, 286, 392, 306), DT_RIGHT);
+    if hover == Some(Hit::Info) {
+        // The explanation, as a panel above the card (so the ⓘ itself stays uncovered).
+        let panel = r(40, 104, 400, 258);
+        fill(dc, panel, BG, s(12), Some(MUTED));
+        text(dc, "How the counter works", s(13), 600, TEXT, r(54, 112, 386, 132), DT_LEFT);
+        let body = "Text you can't select usually means: screenshot it, paste it into an OCR or AI tool, wait, \
+copy the result, come back. Nab is one click.\n\nIt counts that as about 20 seconds and 5 steps per copy, \
+and a minute and 7 steps for a table (asking for a table and fixing the columns in Excel). \
+It's an estimate: nothing is measured, and nothing is sent anywhere.";
+        with_font(dc, s(12), 400, || {
+            SetTextColor(dc, MUTED);
+            let mut wide: Vec<u16> = body.encode_utf16().collect();
+            let mut rect = r(54, 134, 386, 254);
+            DrawTextW(dc, &mut wide, &mut rect, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+        });
+    }
 
     // Buttons
     let pick = |h: Hit, c: (COLORREF, COLORREF)| if hover == Some(h) { c.1 } else { c.0 };
