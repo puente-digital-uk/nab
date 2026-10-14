@@ -63,8 +63,11 @@ if ($DevSign) {
     $signtool = Find-SdkTool "signtool.exe"
     $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq $Publisher -and $_.FriendlyName -eq "Nab dev signing" } | Select-Object -First 1
     if (-not $cert) {
+        # Non-exportable and short-lived: anything that can sign with it can sideload packages on
+        # every PC that trusts it (see install-dev.ps1 / uninstall-dev.ps1).
         $cert = New-SelfSignedCertificate -Type Custom -Subject $Publisher -FriendlyName "Nab dev signing" `
-            -KeyUsage DigitalSignature -CertStoreLocation Cert:\CurrentUser\My `
+            -KeyUsage DigitalSignature -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy NonExportable `
+            -NotAfter (Get-Date).AddMonths(3) `
             -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
     }
     & $signtool sign /fd SHA256 /sha1 $cert.Thumbprint $Out | Out-Null

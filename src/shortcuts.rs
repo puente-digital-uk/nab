@@ -15,7 +15,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use crate::trigger::{self, Button, Input, Trigger};
 use crate::{logic, sys};
 
-const HOTKEY_ID: i32 = 1;
+pub const HOTKEY_ID: i32 = 1;
 const KEY_SETTING: &str = "KeyShortcut";
 const MOUSE_SETTING: &str = "MouseShortcut";
 

@@ -32,7 +32,7 @@ Then check, from the installed copy (Start → Nab):
 - Ctrl+Shift+click and Alt+Space work.
 - Tick **Start with Windows** → it appears in Settings › Apps › Startup as "Nab". Sign out and in: Nab is in the tray and no window opened.
 - Untick it → it disappears from Startup.
-- Uninstall: `Get-AppxPackage *Nab* | Remove-AppxPackage`.
+- Uninstall with `.\msix\uninstall-dev.ps1`. That also removes the dev certificate from the machine's Trusted People store, which matters: while it's trusted, anything that can sign with it could sideload a package on this PC. The certificate is non-exportable and expires after 3 months.
 
 Run the Windows App Certification Kit too if you have the SDK (`appcert.exe test -appxpackage dist\Nab.msix -reportoutputpath wack.xml`); it catches the things certification would reject.
 

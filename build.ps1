@@ -4,15 +4,15 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 Write-Host "`n== Lint ==" -ForegroundColor Cyan
-cargo clippy --all-targets -- -D warnings
+cargo clippy --locked --all-targets -- -D warnings
 if ($LASTEXITCODE) { throw "clippy failed" }
 
 Write-Host "`n== Tests (unit + real OCR, clipboard, registry) ==" -ForegroundColor Cyan
-cargo test -- --test-threads=1 --nocapture
+cargo test --locked -- --test-threads=1 --nocapture
 if ($LASTEXITCODE) { throw "tests failed" }
 
 Write-Host "`n== Release build ==" -ForegroundColor Cyan
-cargo build --release
+cargo build --locked --release
 if ($LASTEXITCODE) { throw "build failed" }
 
 $exe = Get-Item target\release\nab.exe

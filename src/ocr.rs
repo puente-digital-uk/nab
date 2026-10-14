@@ -18,10 +18,27 @@ type Outcome = std::result::Result<Grab, String>;
 #[cfg(test)]
 pub static REPORTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
+/// Reads in flight. A person can't start more than a couple; a flood of forged drag events could.
+static READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+const MAX_READS: usize = 2;
+
 /// Read an area in the background, then hand the result to the UI thread (which owns the clipboard).
 /// `fallback` is what the screen scan already found there, used if the closer read finds nothing.
 pub fn spawn(bgra: Vec<u8>, w: u32, h: u32, fallback: Option<Grab>) {
+    use std::sync::atomic::Ordering::SeqCst;
+    if READS.fetch_add(1, SeqCst) >= MAX_READS {
+        READS.fetch_sub(1, SeqCst);
+        crate::mailbox::post::<Outcome>(crate::WM_OCR_DONE, Err("Still reading the last one — try again in a moment.".into()));
+        return;
+    }
     let spawned = std::thread::Builder::new().name("nab-read".into()).spawn(move || {
+        struct Done;
+        impl Drop for Done {
+            fn drop(&mut self) {
+                READS.fetch_sub(1, SeqCst);
+            }
+        }
+        let _done = Done;
         // Tables only for dragged boxes: a click (which has a fallback) is about one block.
         let tables = fallback.is_none();
         let res = match (read(&bgra, w, h, tables), fallback) {
@@ -34,6 +51,7 @@ pub fn spawn(bgra: Vec<u8>, w: u32, h: u32, fallback: Option<Grab>) {
         crate::mailbox::post::<Outcome>(crate::WM_OCR_DONE, res);
     });
     if spawned.is_err() {
+        READS.fetch_sub(1, SeqCst);
         crate::mailbox::post::<Outcome>(crate::WM_OCR_DONE, Err("Couldn't start a background task — try again.".into()));
     }
 }
