@@ -75,7 +75,7 @@ jobs:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           files: dist/nab.exe
       - name: "Attest where this exe came from (verify with: gh attestation verify nab.exe --owner puente-digital-uk)"
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/nab.exe
       - name: Write the release notes
