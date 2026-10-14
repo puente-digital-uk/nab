@@ -27,6 +27,8 @@ Thanks for looking. Nab is small on purpose, so the bar for new features is "doe
 .\build.ps1    # clippy -D warnings, every test (some drive real windows on screen), release build
 ```
 
+Everything runs with `--locked`: `Cargo.lock` is the record of exactly what a release was built from, so a build never rewrites it. If you need a newer dependency, change it on purpose (`cargo update -p <crate>`) and commit the lockfile with the change.
+
 CI runs the same on a clean Windows runner for every pull request. Please keep it green.
 
 ## Commits and pull requests
