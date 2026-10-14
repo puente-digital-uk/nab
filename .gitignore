@@ -1,0 +1,8 @@
+/target
+/.cargo
+*.zip
+/dist
+/msix/.pkg
+*.msix
+*.pfx
+*.cer

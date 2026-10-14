@@ -1,0 +1,50 @@
+[package]
+name = "nab"
+version = "0.4.0"
+edition = "2021"
+authors = ["Pablo Puente <hello@puentedigital.co.uk>"]
+description = "Ctrl+Shift+click any text on screen (or drag a box) and it is on your clipboard. Tiny, offline, free."
+homepage = "https://www.puentedigital.co.uk/"
+license = "MIT"
+repository = "https://github.com/puente-digital-uk/nab"
+readme = "README.md"
+keywords = ["ocr", "clipboard", "screenshot", "windows", "productivity"]
+categories = ["gui", "os::windows-apis"]
+publish = false
+
+[dependencies]
+windows = { version = "0.58", features = [
+    "ApplicationModel",
+    "ApplicationModel_Activation",
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Storage_Packaging_Appx",
+    "Win32_System_DataExchange",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_System_WinRT",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+embed-resource = "3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

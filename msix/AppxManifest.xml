@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Template: msix\build.ps1 fills in the {{...}} placeholders.
+  Identity Name / Publisher / PublisherDisplayName must match what Partner Center shows under
+  Product management > Product identity for the "Nab" name reservation (see msix\STORE.md).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 rescap">
+
+  <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Nab</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY}}</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Copy text from anything on your screen. Hold Ctrl+Shift and click on any text, or drag a box. Offline, using the OCR built into Windows.</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- 1809: first Windows 10 with the startup-task API for desktop apps. OCR itself is in every Windows 10/11. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22631.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-GB" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Nab" Executable="nab.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Nab"
+        Description="Copy text from anything on your screen: hold Ctrl+Shift and click, or drag a box."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- "Start with Windows" for packaged installs. TaskId must match sys::STARTUP_TASK. -->
+        <uap5:Extension Category="windows.startupTask" Executable="nab.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask TaskId="NabStartup" Enabled="false" DisplayName="Nab" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- A normal desktop app (global hotkey, mouse hook, screen capture, clipboard). No network. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
