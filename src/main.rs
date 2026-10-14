@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Threading::CreateMutexW;
+use windows::Win32::System::Threading::{CreateMutexW, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION};
 use windows::Win32::UI::HiDpi::{SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2};
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -116,6 +116,17 @@ pub fn instance() -> HINSTANCE {
     unsafe { GetModuleHandleW(None).map(Into::into).unwrap_or_default() }
 }
 
+/// Is `pid` running the same executable as us?
+unsafe fn is_our_exe(pid: u32) -> bool {
+    let Ok(ours) = std::env::current_exe() else { return false };
+    let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else { return false };
+    let mut buf = [0u16; 1024];
+    let mut len = buf.len() as u32;
+    let ok = QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, windows::core::PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+    let _ = CloseHandle(process);
+    ok && len as usize <= buf.len() && String::from_utf16_lossy(&buf[..len as usize]).eq_ignore_ascii_case(&ours.to_string_lossy())
+}
+
 /// Register window classes and create the hidden host window that owns the tray icon,
 /// the hotkey and the clipboard.
 unsafe fn create_host() -> Option<HWND> {
@@ -131,16 +142,22 @@ unsafe fn create_host() -> Option<HWND> {
 
 fn main() {
     unsafe {
-        // One copy only: a second launch just opens the existing window.
+        // One copy only: a second launch just opens the existing window. The window has to belong
+        // to a real nab.exe, though: anyone can create a window with our class name, and a squatter
+        // mustn't be able to keep Nab from starting or be handed the right to take the foreground.
         let _mutex = CreateMutexW(None, true, w!("Local\\PuenteDigital.Nab"));
         if GetLastError() == ERROR_ALREADY_EXISTS {
             if let Ok(existing) = FindWindowW(HOST_CLASS, None) {
                 let mut pid = 0;
                 GetWindowThreadProcessId(existing, Some(&mut pid));
-                let _ = AllowSetForegroundWindow(pid); // so it can come to the front
-                let _ = PostMessageW(existing, WM_SHOW_HOME, WPARAM(0), LPARAM(0));
+                if is_our_exe(pid) {
+                    let _ = AllowSetForegroundWindow(pid); // so it can come to the front
+                    let _ = PostMessageW(existing, WM_SHOW_HOME, WPARAM(0), LPARAM(0));
+                    return;
+                }
+            } else {
+                return; // a real instance that is still starting up (or exiting); don't double up
             }
-            return;
         }
         if create_host().is_none() {
             return;
@@ -169,7 +186,7 @@ fn main() {
 extern "system" fn host_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     unsafe {
         match msg {
-            WM_HOTKEY => {
+            WM_HOTKEY if wp.0 as i32 == shortcuts::HOTKEY_ID => {
                 capture::start(false);
             }
             WM_MOUSE_DOWN => {
@@ -193,7 +210,6 @@ extern "system" fn host_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 WM_CONTEXTMENU => tray_menu(hwnd, logic::unpack_point(wp.0 as isize)),
                 _ => {}
             },
-            WM_COMMAND => run(wp.0 & 0xffff),
             _ if msg == TASKBAR_CREATED.load(Ordering::SeqCst) && msg != 0 => sys::tray(NIM_ADD, None), // Explorer restarted
             _ => return DefWindowProcW(hwnd, msg, wp, lp),
         }
@@ -239,9 +255,13 @@ unsafe fn tray_menu(hwnd: HWND, (x, y): (i32, i32)) {
     }
     let _ = SetMenuDefaultItem(menu, CMD_GRAB as u32, 0);
     let _ = SetForegroundWindow(hwnd); // lets the menu close when you click elsewhere
-    let _ = TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN, x, y, 0, hwnd, None);
+    // TPM_RETURNCMD: the choice comes back here instead of as a WM_COMMAND, which any process could forge.
+    let chosen = TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RETURNCMD, x, y, 0, hwnd, None).0;
     let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
     let _ = DestroyMenu(menu);
+    if chosen > 0 {
+        run(chosen as usize);
+    }
 }
 
 #[cfg(test)]
@@ -533,6 +553,9 @@ mod smoke {
                 SendMessageW(host, WM_SCAN_DONE, WPARAM(0), LPARAM(lp));
             }
             assert_eq!(ocr::REPORTS.load(Ordering::SeqCst), before);
+            // A hotkey message with someone else's id does nothing.
+            SendMessageW(host, WM_HOTKEY, WPARAM(99), LPARAM(0));
+            assert!(!capture::is_open());
 
             // A real result arrives exactly once, and only as the message type it was posted as.
             mailbox::post(WM_APP + 50, 4242u32);
@@ -543,6 +566,15 @@ mod smoke {
             assert_eq!(mailbox::take::<u32>(WM_APP + 50, m.lParam), Some(4242));
             assert_eq!(mailbox::take::<u32>(WM_APP + 50, m.lParam), None);
             let _ = DestroyWindow(host);
+        }
+    }
+
+    #[test]
+    fn only_a_real_nab_counts_as_the_running_instance() {
+        unsafe {
+            assert!(is_our_exe(windows::Win32::System::Threading::GetCurrentProcessId()));
+            assert!(!is_our_exe(4)); // the System process
+            assert!(!is_our_exe(0xFFFF_FFF0)); // no such process
         }
     }
 
