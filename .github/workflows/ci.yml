@@ -81,9 +81,12 @@ jobs:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           files: dist/nab.exe
       - name: "Attest where this exe came from (verify with: gh attestation verify nab.exe --owner puente-digital-uk)"
+        id: attest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: dist/nab.exe
+      - name: Keep the signature bundle next to the exe too
+        run: cp "${{ steps.attest.outputs.bundle-path }}" dist/nab.exe.sigstore.json
       - name: Write the release notes
         env:
           VT_ANALYSIS: ${{ steps.vt.outputs.analysis }}
@@ -110,5 +113,6 @@ jobs:
           files: |
             dist/nab.exe
             dist/SHA256SUMS.txt
+            dist/nab.exe.sigstore.json
           body_path: notes.md
           generate_release_notes: true

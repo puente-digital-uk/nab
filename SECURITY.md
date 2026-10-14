@@ -22,4 +22,4 @@ Nab reads your screen and writes to your clipboard, so we take reports seriously
 
 ## Verifying a download
 
-Every GitHub Release lists the SHA-256 of `nab.exe`; check it with `Get-FileHash nab.exe` in PowerShell. Releases are built by GitHub Actions from the tag, the run is linked from the release notes, and the build is attested: with the [GitHub CLI](https://cli.github.com/), `gh attestation verify nab.exe --owner puente-digital-uk` proves the file came from this repository's release workflow and names the exact commit. The Microsoft Store version is signed by Microsoft.
+Every GitHub Release lists the SHA-256 of `nab.exe`; check it with `Get-FileHash nab.exe` in PowerShell. Releases are built by GitHub Actions from the tag, the run is linked from the release notes, and the build is attested: with the [GitHub CLI](https://cli.github.com/), `gh attestation verify nab.exe --owner puente-digital-uk` proves the file came from this repository's release workflow and names the exact commit. The same signature is attached to the release as `nab.exe.sigstore.json` for tools that read Sigstore bundles. The Microsoft Store version is signed by Microsoft.
