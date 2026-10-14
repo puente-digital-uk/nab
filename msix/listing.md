@@ -29,7 +29,7 @@ Free and open source (MIT). Made by Puente Digital.
 
 ## What's new (first submission)
 
-First release.
+First release (beta).
 
 ## Search terms (up to 7)
 

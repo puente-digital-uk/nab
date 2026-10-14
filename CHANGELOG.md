@@ -2,9 +2,9 @@
 
 All notable changes to Nab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
-## [0.4.0] – 2026-10-14
+## [0.1.0] – 2026-10-14 (beta)
 
-First public release.
+First public release, as a beta: it works and is used daily, but expect rough edges. Please report them.
 
 ### Added
 - Ctrl+Shift+click copies the block of text under the pointer; Ctrl+Shift+drag copies a box. Both shortcuts can be changed.

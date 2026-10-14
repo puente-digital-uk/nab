@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>⬇ Download for Windows</b></a> ·
+  <a href="../../releases"><b>⬇ Download for Windows (beta)</b></a> ·
   <a href="https://buymeacoffee.com/puentedigital">☕ Buy me a coffee</a> ·
   <a href="https://www.puentedigital.co.uk/">Puente Digital</a>
 </p>
@@ -38,9 +38,11 @@ Text stuck in an image, a video, a screenshot, a PDF that won't let you select, 
 - **Any language Windows supports.** It reads in your Windows display languages.
 - **Free and open source** (MIT).
 
+> **Beta.** Nab works and is used every day, but it's new: expect rough edges, and please [report](../../issues) what you hit. Releases stay marked "pre-release" until 1.0.
+
 ## Install
 
-1. Download `nab.exe` from [Releases](../../releases/latest). Put it wherever you like (Documents, a tools folder); there is no installer.
+1. Download `nab.exe` from the latest [release](../../releases). Put it wherever you like (Documents, a tools folder); there is no installer.
 2. Run it. If Windows SmartScreen says it *prevented an unrecognised app from starting*, click **More info → Run anyway**. That warning appears because this build isn't code-signed yet, not because anything is wrong with it. You can check the file against the SHA-256 in the release notes: `Get-FileHash nab.exe` in PowerShell.
 3. Nab's window opens once and then sits in the tray (the **N** icon near the clock). Tick **Start with Windows** if you want it always there.
 

@@ -58,6 +58,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write     # build provenance attestation
+      attestations: write
     env:
       VT_API_KEY: ${{ secrets.VT_API_KEY }} # optional: a free VirusTotal key; see SECURITY.md
     steps:
@@ -72,6 +74,10 @@ jobs:
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           files: dist/nab.exe
+      - name: "Attest where this exe came from (verify with: gh attestation verify nab.exe --owner puente-digital-uk)"
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/nab.exe
       - name: Write the release notes
         env:
           VT_ANALYSIS: ${{ steps.vt.outputs.analysis }}
@@ -89,10 +95,12 @@ jobs:
 
           SHA-256 of \`nab.exe\`: \`$sum\` — check it with \`Get-FileHash nab.exe\` in PowerShell. $vt
 
-          Built from this tag by GitHub Actions ([the run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})), so the binary matches the public source.
+          Built from this tag by GitHub Actions ([the run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})), so the binary matches the public source. Provenance is attested: \`gh attestation verify nab.exe --owner puente-digital-uk\` proves it came from this workflow and commit.
           EOF
       - uses: softprops/action-gh-release@v2
         with:
+          name: Nab ${{ github.ref_name }}${{ startsWith(github.ref_name, 'v0.') && ' (beta)' || '' }}
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }} # every 0.x release is a beta
           files: |
             dist/nab.exe
             dist/SHA256SUMS.txt

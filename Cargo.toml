@@ -1,6 +1,6 @@
 [package]
 name = "nab"
-version = "0.4.0"
+version = "0.1.0"
 edition = "2021"
 authors = ["Pablo Puente <hello@puentedigital.co.uk>"]
 description = "Ctrl+Shift+click any text on screen (or drag a box) and it is on your clipboard. Tiny, offline, free."
