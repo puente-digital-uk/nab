@@ -126,7 +126,14 @@ pub fn html_table(rows: &[Vec<String>]) -> String {
     for row in rows {
         out.push_str("<tr>");
         for cell in row {
-            out.push_str("<td>");
+            match x_num(cell) {
+                Some(v) => {
+                    out.push_str("<td x:num=\"");
+                    out.push_str(&v);
+                    out.push_str("\">");
+                }
+                None => out.push_str("<td>"),
+            }
             out.push_str(&escape_html(cell));
             out.push_str("</td>");
         }
@@ -241,6 +248,103 @@ fn is_number(s: &str) -> bool {
         }
     }
     prev_digit
+}
+
+/// A number shaped like "1,533" or "1.533": digits, one separator, exactly three digits after it.
+/// On its own it is ambiguous — a thousands separator, or three decimal places.
+fn grouped(s: &str) -> Option<char> {
+    let body = s.strip_prefix('-').unwrap_or(s);
+    let i = body.find(['.', ','])?;
+    let (head, rest) = body.split_at(i);
+    let sep = rest.chars().next()?;
+    let tail = &rest[1..];
+    let ok = !head.is_empty()
+        && head.len() <= 3
+        && head.chars().all(|c| c.is_ascii_digit())
+        && tail.len() == 3
+        && tail.chars().all(|c| c.is_ascii_digit());
+    ok.then_some(sep)
+}
+
+/// A thousands separator misread: "1,533" comes back as "1.533", a thousand times too small and
+/// looking perfectly normal. Decided from the column's own numbers — where the others of that
+/// shape agree on a separator, the odd one out is the same number read wrong. At least two must
+/// agree, so one stray value can't rewrite a column, and a column of genuine three-decimal
+/// numbers (nothing disagreeing) is left alone.
+pub fn fix_separators(cells: &mut [String]) -> bool {
+    let (mut commas, mut dots) = (0, 0);
+    for c in cells.iter() {
+        match grouped(c) {
+            Some(',') => commas += 1,
+            Some('.') => dots += 1,
+            _ => {}
+        }
+    }
+    let want = match (commas, dots) {
+        (c, d) if c >= 2 && d >= 1 && c > d => ',',
+        (c, d) if d >= 2 && c >= 1 && d > c => '.',
+        _ => return false,
+    };
+    let mut changed = false;
+    for c in cells.iter_mut() {
+        if grouped(c).is_some_and(|sep| sep != want) {
+            *c = c.replace(['.', ','], &want.to_string());
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// A decimal point lost in a scan: "12.4" read back as "12 4", the gap splitting it in two.
+/// Repaired only where the rest of the column is decimals of the same shape, so "Page 4" stays.
+pub fn fix_lost_points(cells: &mut [String]) -> bool {
+    let two_parts = |s: &str, sep: char| -> Option<(String, String)> {
+        let mut parts = s.split(sep);
+        match (parts.next(), parts.next(), parts.next()) {
+            (Some(a), Some(b), None)
+                if !a.is_empty()
+                    && a.chars().all(|c| c.is_ascii_digit())
+                    && (1..=2).contains(&b.len())
+                    && b.chars().all(|c| c.is_ascii_digit()) =>
+            {
+                Some((a.to_string(), b.to_string()))
+            }
+            _ => None,
+        }
+    };
+    if cells.iter().filter(|c| two_parts(c, '.').is_some()).count() < 2 {
+        return false;
+    }
+    let mut changed = false;
+    for c in cells.iter_mut() {
+        if let Some((a, b)) = two_parts(c, ' ') {
+            *c = format!("{a}.{b}");
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// Excel reads "19.8" pasted into a cell as 19 August. A cell of that shape therefore carries its
+/// value in `x:num`, which Excel takes as given instead of guessing. Only unambiguous shapes get
+/// one: "1,533" could be 1533 or 1.533, and Excel never turns that into a date anyway.
+fn x_num(cell: &str) -> Option<String> {
+    if !is_number(cell) || grouped(cell).is_some() {
+        return None;
+    }
+    let neg = cell.starts_with('-');
+    let body = cell.strip_prefix('-').unwrap_or(cell);
+    let i = body.rfind(['.', ','])?;
+    let (head, tail) = (&body[..i], &body[i + 1..]);
+    if !(1..=2).contains(&tail.len()) || !tail.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    // Any separator inside the integer part must group three digits, or this isn't a shape we know.
+    if head.split([',', '.']).skip(1).any(|g| g.len() != 3) {
+        return None;
+    }
+    let int: String = head.chars().filter(|c| c.is_ascii_digit()).collect();
+    (!int.is_empty()).then(|| format!("{}{int}.{tail}", if neg { "-" } else { "" }))
 }
 
 /// What one nab saves compared with the usual route for text you can't select: screenshot it,
@@ -369,6 +473,49 @@ mod tests {
         assert_eq!(scale_factor(9000, 20, 10_000), 1);
         assert_eq!(scale_factor(20_000, 20, 10_000), 1);
         assert_eq!(scale_factor(0, 0, 10_000), 4);
+    }
+
+    #[test]
+    fn misread_thousands_separator_fixed_from_the_rest_of_the_column() {
+        let col = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // The column from the first demo: 1,533 came back as 1.533.
+        let mut c = col(&["Mains (km)", "1,284", "2,016", "847", "1.533", "968", "6,648"]);
+        assert!(fix_separators(&mut c));
+        assert_eq!(c[4], "1,533");
+        assert_eq!((&c[0], &c[3]), (&"Mains (km)".to_string(), &"847".to_string()));
+        // The other way round, for a column that groups with points.
+        let mut euro = col(&["1.284", "2.016", "1,533", "6.648"]);
+        assert!(fix_separators(&mut euro));
+        assert_eq!(euro[2], "1.533");
+        // One example either way decides nothing, and a real three-decimal column is left alone.
+        assert!(!fix_separators(&mut col(&["1,284", "1.533"])));
+        assert!(!fix_separators(&mut col(&["0.125", "0.250", "1.533"])));
+        assert!(!fix_separators(&mut col(&["12.4", "7.1", "64.1"])));
+    }
+
+    #[test]
+    fn decimal_point_lost_in_a_scan_is_restored_from_the_column() {
+        let col = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let mut c = col(&["Losses (Ml/d)", "12 4", "19.8", "7.1", "15.6", "9.2", "64.1"]);
+        assert!(fix_lost_points(&mut c));
+        assert_eq!(c[1], "12.4");
+        assert_eq!(c[0], "Losses (Ml/d)");
+        // Nothing to go on: "Page 4" and "12 4" stay as they are.
+        assert!(!fix_lost_points(&mut col(&["Page 4", "12 4", "Total 9"])));
+        assert!(!fix_lost_points(&mut col(&["318", "12 4", "501"])));
+    }
+
+    #[test]
+    fn numeric_cells_carry_their_value_so_excel_cannot_read_them_as_dates() {
+        let row = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let h = html_table(&[row(&["District", "Losses"]), row(&["Marlow Vale", "19.8"]), row(&["Pinner Reach", "1,533"])]);
+        assert!(h.contains("<td x:num=\"19.8\">19.8</td>"), "{h}");
+        assert!(h.contains("<td>1,533</td>"), "ambiguous shape: left to Excel, which reads it as 1533 — {h}");
+        assert!(h.contains("<td>District</td>"), "{h}");
+        assert_eq!(x_num("-12,345.60").as_deref(), Some("-12345.60"));
+        assert_eq!(x_num("12.4").as_deref(), Some("12.4"));
+        assert_eq!(x_num("94%"), None);
+        assert_eq!(x_num("1,284"), None);
     }
 
     #[test]

@@ -38,10 +38,13 @@ Text stuck in an image, a video, a screenshot, a PDF that won't let you select, 
 - **Free and open source** (MIT).
 
 > **Beta.** Nab works and is used every day, but it's new: expect rough edges, and please [report](../../issues) what you hit. Releases stay marked "pre-release" until 1.0.
+>
+> **Check numbers from small or scanned sources.** At low resolution a comma and a full stop are a pixel apart, so a figure can come back wrong in a way that still looks plausible (`1,533` as `1.533`). Nab now repairs the common cases using the rest of the column as evidence, but the OCR is only as good as the pixels: if the text is small, zoom in before you nab it, and check the figures that matter.
 
 ## Install
 
 1. Download `nab.exe` from the latest [release](../../releases). Put it wherever you like (Documents, a tools folder); there is no installer.
+   *Download blocked?* Take `nab.zip` from the same release instead — the same exe, zipped. See [Is this safe?](#is-this-safe) below.
 2. Run it. If Windows SmartScreen says it *prevented an unrecognised app from starting*, click **More info → Run anyway**. That warning appears because this build isn't code-signed yet, not because anything is wrong with it. You can check the file against the SHA-256 in the release notes: `Get-FileHash nab.exe` in PowerShell.
 3. Nab's window opens once and then sits in the tray (the **N** icon near the clock). Tick **Start with Windows** if you want it always there.
 
@@ -71,6 +74,24 @@ Open Nab (click the tray icon), press **Change** next to a shortcut, then:
 Press **Delete** to turn a shortcut off, or **Esc** to cancel. Your choice is saved. Tick **Start with Windows** to always have it handy.
 
 > The mouse shortcut takes over that click everywhere while Nab runs. If an app you use needs Ctrl+Shift+click (some browsers use it to open a link in a new tab), pick something else, such as Ctrl+Alt+click or Ctrl+middle click.
+
+## Is this safe?
+
+Your browser, SmartScreen or your antivirus may object to downloading or running `nab.exe`. That is about **reputation, not detection**: a brand-new executable, downloaded a handful of times and not yet code-signed, has nothing for a reputation engine to go on, so some filters block it on principle. Nothing in Nab connects to the internet — there is no network code in it at all.
+
+Rather than ask you to take that on trust, here is how to check for yourself, in about a minute:
+
+```powershell
+# 1. The file is byte-for-byte the one this project published
+Get-FileHash nab.exe        # compare with SHA256SUMS.txt in the release
+
+# 2. It was built by this repo's CI, from this tag, and not touched since
+gh attestation verify nab.exe --owner puente-digital-uk
+```
+
+The second one is the strong check: it verifies a signed build-provenance attestation, so it proves the exe came out of [the public workflow](.github/workflows/ci.yml) at a specific commit — not from someone's laptop. Each release also links a VirusTotal scan of that exact file, and you can always [build it yourself](#build-from-source) and compare.
+
+The permanent fix is code signing, and it is on the way: a Microsoft Store build (signed by Microsoft, no warning at all) is in preparation, and the GitHub `.exe` follows once the project qualifies for free open-source signing. Until then, the checks above are how you verify rather than trust.
 
 ## Safe to run
 

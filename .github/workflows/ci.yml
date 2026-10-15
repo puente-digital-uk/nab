@@ -17,7 +17,7 @@ jobs:
     name: Dependency advisories, licences, sources # ~40s
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           command: check advisories bans licenses sources
@@ -27,7 +27,7 @@ jobs:
     needs: deps
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master; the version comes from rust-toolchain.toml
         with:
           toolchain: 1.97.0
@@ -51,8 +51,14 @@ jobs:
         run: |
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item target\release\nab.exe dist\
-          $hash = (Get-FileHash dist\nab.exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  nab.exe" | Out-File dist\SHA256SUMS.txt -Encoding ascii
+          # Browsers and antivirus web filters block a bare, unsigned .exe on reputation alone, before
+          # anything has looked inside it. The same file inside a zip usually downloads cleanly, so both
+          # are published and both are hashed.
+          Compress-Archive -Path dist\nab.exe -DestinationPath dist\nab.zip -Force
+          foreach ($f in 'nab.exe', 'nab.zip') {
+            $hash = (Get-FileHash "dist\$f" -Algorithm SHA256).Hash.ToLower()
+            "$hash  $f" | Out-File dist\SHA256SUMS.txt -Encoding ascii -Append
+          }
           Get-Content dist\SHA256SUMS.txt
       - name: Build the MSIX (unsigned; the Microsoft Store signs it)
         shell: pwsh
@@ -79,7 +85,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: github/codeql-action/init@9f759ee644a3e7c15c1390abf49868036c00067b # v3
         with:
           languages: rust
@@ -107,13 +113,13 @@ jobs:
       - name: Scan the exe with VirusTotal
         id: vt
         if: env.VT_API_KEY != ''
-        uses: crazy-max/ghaction-virustotal@d34968c958ae283fe976efed637081b9f9dcf74f # v4
+        uses: crazy-max/ghaction-virustotal@936d8c5c00afe97d3d9a1af26d017cfdf26800a2 # v5
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           files: dist/nab.exe
       - name: "Attest where this exe came from (verify with: gh attestation verify nab.exe --owner puente-digital-uk)"
         id: attest
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: dist/nab.exe
       - name: Keep the signature bundle next to the exe too
@@ -122,7 +128,7 @@ jobs:
         env:
           VT_ANALYSIS: ${{ steps.vt.outputs.analysis }}
         run: |
-          sum=$(cut -d' ' -f1 dist/SHA256SUMS.txt)
+          sum=$(grep ' nab.exe$' dist/SHA256SUMS.txt | cut -d' ' -f1)
           vt=""
           if [ -n "$VT_ANALYSIS" ]; then
             url=$(printf '%s' "$VT_ANALYSIS" | tr ',' '\n' | grep '^dist/nab.exe=' | cut -d= -f2-)
@@ -133,16 +139,19 @@ jobs:
 
           Windows SmartScreen may say it "prevented an unrecognised app from starting" because this build isn't code-signed yet. Click **More info → Run anyway**. The Microsoft Store version is signed by Microsoft and shows no warning.
 
+          If your browser or antivirus blocks the download itself, take \`nab.zip\` instead \u2014 the same exe, zipped. A new unsigned exe has no download reputation yet, and some web filters treat that alone as suspicious. Nothing in this build connects to the internet; check it against the scan and the hash below, or build it yourself from this tag.
+
           SHA-256 of \`nab.exe\`: \`$sum\` — check it with \`Get-FileHash nab.exe\` in PowerShell. $vt
 
           Built from this tag by GitHub Actions ([the run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})), so the binary matches the public source. Provenance is attested: \`gh attestation verify nab.exe --owner puente-digital-uk\` proves it came from this workflow and commit.
           EOF
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           name: Nab ${{ github.ref_name }}${{ startsWith(github.ref_name, 'v0.') && ' (beta)' || '' }}
           prerelease: ${{ startsWith(github.ref_name, 'v0.') }} # every 0.x release is a beta
           files: |
             dist/nab.exe
+            dist/nab.zip
             dist/SHA256SUMS.txt
             dist/nab.exe.sigstore.json
           body_path: notes.md
