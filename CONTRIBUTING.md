@@ -6,6 +6,7 @@ Thanks for looking. Nab is small on purpose, so the bar for new features is "doe
 
 - Open an issue first for anything bigger than a bug fix, so we can agree on the shape before you spend time on it.
 - Out of scope, to save you the effort: cloud or AI features, translation, clipboard history, anything that needs the network.
+- Nab is open core: this repository is the whole free tool (MIT). A separate, closed add-on (Nab Pro) plugs in through `src/ext.rs` and is not part of this repository or open to contributions. Features that exist in the free tool today will stay free; if you are unsure whether an idea belongs in the free tool, ask in an issue first.
 
 ## Ground rules for code
 
@@ -15,6 +16,7 @@ Thanks for looking. Nab is small on purpose, so the bar for new features is "doe
 - **Never hold a `RefCell` borrow across a call that re-enters the window procedure** (`DestroyWindow`, `ShowWindow`, `SetForegroundWindow`, `SetCapture`, `TrackPopupMenu` …).
 - **Pure logic goes in pure modules** (`blocks.rs`, `trigger.rs`, `logic.rs`) with unit tests that run on any OS.
 - **Tests never touch the real settings**: they use the `…\Nab-tests` registry key and the `Nab-tests` Run value.
+- **`src/ext.rs` is the boundary, so changes to it are API changes.** Every hook must default to doing nothing, the free tool must never wait for the closed module, and nothing in the free paths may depend on whether a module is installed. Nothing in this repository may enable the Windows Store API (CI checks).
 - British English in anything the user sees.
 
 ## Toolchain

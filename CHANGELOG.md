@@ -2,6 +2,19 @@
 
 All notable changes to Nab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.0] – unreleased (beta)
+
+Nothing the free tool does has changed. This release only makes room for an optional, separate add-on.
+
+### Added
+- `src/ext.rs`: the single, documented place where an optional closed module (**Nab Pro**, sold separately on the Microsoft Store) can plug in. With no module installed, which is every GitHub download, every hook does nothing.
+- `nab` is now a library plus a thin `main`, so the Store build can link the free tool and the closed module together. The GitHub build is unchanged: it is this crate with no module.
+- `msix/build.ps1 -Version` (the Store package can carry its own version).
+- CI checks that the public build never enables the Windows Store API.
+
+### Free forever
+- Everything that was free is still free: click to copy, drag a box, tables, paragraph reflow, Alt+Space, configurable shortcuts. Nothing moves behind a payment.
+
 ## [0.1.1] – 2026-10-14 (beta)
 
 Hardening from a security review (no vulnerabilities found; all defence-in-depth):

@@ -73,20 +73,27 @@ pub fn summary(g: &Grab) -> (String, String) {
     }
 }
 
-/// Runs on the UI thread: copy and notify.
+/// Runs on the UI thread: copy and notify. A closed module (see `ext`) may take the grab over
+/// instead; with none installed the clipboard path below is the only one there is.
 pub fn report(lp: LPARAM) {
     let Some(res) = crate::mailbox::take::<Outcome>(crate::WM_OCR_DONE, lp) else { return };
     #[cfg(test)]
     REPORTS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let res = res.and_then(|g| {
-        let html = g.table.as_deref().map(logic::html_table);
-        sys::set_clipboard(&g.text, html.as_deref()).map(|_| g)
+    let res = res.and_then(|g| match crate::ext::pro().deliver(&g) {
+        Some(handled) => handled.map(|h| (g, Some(h))),
+        None => {
+            let html = g.table.as_deref().map(logic::html_table);
+            sys::set_clipboard(&g.text, html.as_deref()).map(|_| (g, None))
+        }
     });
     match res {
-        Ok(g) => {
+        Ok((g, handled)) => {
             sys::record_nab(g.table.is_some());
             crate::home::refresh();
-            let (title, body) = summary(&g);
+            let (title, body) = match handled {
+                Some(h) => (h.title, h.body),
+                None => summary(&g),
+            };
             sys::tray(NIM_MODIFY, Some((&title, &body)));
         }
         Err(e) => sys::tray(NIM_MODIFY, Some(("Nab", &e))),

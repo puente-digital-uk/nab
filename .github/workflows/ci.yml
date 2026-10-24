@@ -34,6 +34,13 @@ jobs:
           components: clippy
       - name: Lint
         run: cargo clippy --locked --all-targets -- -D warnings
+      - name: The free build has no Store licensing code
+        shell: pwsh
+        run: |
+          # Nab Pro (closed, separate) adds the Windows Store API to its own build. The public
+          # build must never contain it: the free tool makes no calls of that kind.
+          $features = cargo tree --locked -e features -i windows | Out-String
+          if ($features -match 'Services_Store') { throw "Services_Store is enabled in the public build" }
       - name: Test (unit + real Windows OCR, clipboard, registry)
         run: cargo test --locked -- --test-threads=1 --nocapture
       - name: Build release

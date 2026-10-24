@@ -12,6 +12,7 @@ param(
     [string]$PublisherDisplay = "Puente Digital",
     [string]$Exe = "target\release\nab.exe",
     [string]$Out = "dist\Nab.msix",
+    [string]$Version = "",   # x.y.z; default is Cargo.toml's. A build that links a closed module passes its own.
     [switch]$DevSign
 )
 $ErrorActionPreference = "Stop"
@@ -20,9 +21,13 @@ Set-Location $root
 
 if (-not (Test-Path $Exe)) { throw "No $Exe - run .\build.ps1 first." }
 
-# Version: Cargo.toml's x.y.z becomes x.y.z.0 (the Store requires the 4th part to be 0).
-$cargo = Get-Content Cargo.toml -Raw
-if ($cargo -notmatch '(?m)^version = "(\d+)\.(\d+)\.(\d+)"') { throw "Can't read the version from Cargo.toml" }
+# Version: x.y.z becomes x.y.z.0 (the Store requires the 4th part to be 0). Cargo.toml's unless given.
+if (-not $Version) {
+    $cargo = Get-Content Cargo.toml -Raw
+    if ($cargo -notmatch '(?m)^version = "(\d+\.\d+\.\d+)"') { throw "Can't read the version from Cargo.toml" }
+    $Version = $Matches[1]
+}
+if ($Version -notmatch '^(\d+)\.(\d+)\.(\d+)$') { throw "Version must look like 1.2.3, not '$Version'" }
 $version = "$($Matches[1]).$($Matches[2]).$($Matches[3]).0"
 
 # Windows SDK tools (any installed SDK; the newest wins).
