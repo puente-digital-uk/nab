@@ -128,6 +128,9 @@ pub fn is_open() -> bool {
 
 /// Open the selection screen to pick a region for the closed module (see `ext`).
 pub fn pick_region() -> bool {
+    if is_open() {
+        return false; // someone's own grab is on screen: it must stay theirs, not turn into a picker
+    }
     PICK.store(true, Ordering::SeqCst);
     let ok = unsafe { start(false) };
     if !ok {
@@ -138,11 +141,11 @@ pub fn pick_region() -> bool {
 
 /// Read a rectangle of the live screen, as a dragged box would be, and deliver it like any grab.
 pub fn grab_rect(r: crate::ext::ScreenRect) -> bool {
-    let (w, h) = (r.r - r.l, r.b - r.t);
+    let (Some(w), Some(h)) = (r.r.checked_sub(r.l), r.b.checked_sub(r.t)) else { return false };
     let bounds = crate::ext::screen_bounds();
     let inside = r.l >= bounds.l && r.t >= bounds.t && r.r <= bounds.r && r.b <= bounds.b;
-    if is_open() || !inside || w < MIN_REGION_PX || h < MIN_REGION_PX {
-        return false;
+    if is_open() || ocr::busy() || !inside || w < MIN_REGION_PX || h < MIN_REGION_PX {
+        return false; // (busy: don't capture what the reader would refuse anyway)
     }
     unsafe {
         let Some(shot) = Surface::new(w, h) else { return false };

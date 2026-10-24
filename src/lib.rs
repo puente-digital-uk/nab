@@ -680,6 +680,13 @@ mod smoke {
         unsafe {
             let host = create_host().unwrap();
 
+            // Not while someone's own selection screen is open: it must stay theirs.
+            assert!(capture::start(false));
+            assert!(!ext::pick_region());
+            let ov = FindWindowW(w!("NabOverlay"), None).unwrap();
+            SendMessageW(ov, WM_KEYDOWN, WPARAM(VK_ESCAPE.0 as usize), LPARAM(0));
+            pump();
+
             // A dragged box is handed to the module (here there is none) and nothing is read.
             let before = ocr::REPORTS.load(Ordering::SeqCst);
             assert!(ext::pick_region());

@@ -106,6 +106,10 @@ pub trait Pro: Sync {
     /// A hotkey registered with `register_hotkey` was pressed.
     fn hotkey(&self, _id: i32) {}
 
+    /// The person is setting the free tool's own keyboard shortcut to this combination
+    /// (`mods` as MOD_* flags). If you hold it, let go of it: the free tool's shortcut wins.
+    fn yield_hotkey(&self, _mods: u32, _vk: u32) {}
+
     /// The user drew a box after `pick_region`.
     fn region_picked(&self, _region: ScreenRect) {}
 }

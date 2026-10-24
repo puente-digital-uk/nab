@@ -109,6 +109,9 @@ pub fn pause(on: bool) {
 
 /// Change the keyboard shortcut. If another app already owns it, keep the old one.
 pub fn set_key(t: Option<Trigger>) -> Result<(), String> {
+    if let Some(Trigger { mods, input: Input::Key(vk) }) = t {
+        crate::ext::pro().yield_hotkey(mods as u32, vk as u32); // a closed module never keeps this from the free tool
+    }
     let old = KEY.swap(trigger::encode(t), SeqCst);
     if t.is_some() && !try_register() {
         KEY.store(old, SeqCst);

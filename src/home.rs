@@ -73,9 +73,13 @@ fn card() -> Option<crate::ext::Card> {
     crate::ext::pro().card()
 }
 
+/// Whether the window was made with room for the card. Decided once, when it opens, so the layout
+/// can't change under it if a module's card comes and goes.
+static HAS_CARD: AtomicBool = AtomicBool::new(false);
+
 /// How much taller the window is for the card: nothing in the free tool.
 fn extra() -> i32 {
-    if card().is_some() {
+    if HAS_CARD.load(Ordering::SeqCst) {
         CARD_EXTRA
     } else {
         0
@@ -131,6 +135,7 @@ pub fn show() {
             let _ = SetForegroundWindow(hwnd);
             return;
         }
+        HAS_CARD.store(card().is_some(), Ordering::SeqCst);
         let dpi = GetDpiForSystem() as i32;
         let mut r = scaled(dpi, (0, 0, size().0, size().1));
         let _ = AdjustWindowRectExForDpi(&mut r, STYLE, false, WINDOW_EX_STYLE(0), dpi as u32);
@@ -168,7 +173,7 @@ pub fn refresh() {
 
 fn hit_test(dpi: i32, lp: LPARAM) -> Option<Hit> {
     let (x, y) = crate::logic::unpack_point(lp.0);
-    let has_button = card().is_some_and(|c| c.button.is_some());
+    let has_button = extra() > 0 && card().is_some_and(|c| c.button.is_some());
     HITS.into_iter().filter(|&h| h != Hit::Pro || has_button).find(|&h| {
         let r = scaled(dpi, area(h));
         x >= r.left && x < r.right && y >= r.top && y < r.bottom

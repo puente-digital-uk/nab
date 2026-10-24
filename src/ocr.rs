@@ -22,6 +22,11 @@ pub static REPORTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32:
 static READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 const MAX_READS: usize = 2;
 
+/// Both reads a person can have going at once are in flight.
+pub fn busy() -> bool {
+    READS.load(std::sync::atomic::Ordering::SeqCst) >= MAX_READS
+}
+
 /// Read an area in the background, then hand the result to the UI thread (which owns the clipboard).
 /// `fallback` is what the screen scan already found there, used if the closer read finds nothing.
 pub fn spawn(bgra: Vec<u8>, w: u32, h: u32, fallback: Option<Grab>) {
