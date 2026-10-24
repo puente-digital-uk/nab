@@ -101,7 +101,7 @@ Nab is **open core**. The tool in this repository is MIT-licensed and complete: 
 
 - **Append mode:** several grabs build up into one paste. Tables stack as rows (a repeated header row is dropped), and the whole lot is on the clipboard after every grab.
 - **Save as CSV or Excel (.xlsx):** the appended grabs straight to a file, without opening Excel first.
-- **Saved regions:** name a box on the screen once, then grab it again with one hotkey (Ctrl+Alt+Shift+1 to 9).
+- **Saved regions:** name a box on the screen once, then grab it again with one hotkey (Ctrl+Alt+Shift+1 to 9). A region is remembered in screen pixels, so save it again after changing your resolution, scaling or monitor layout. On keyboard layouts where AltGr counts as Ctrl+Alt, a region's hotkey can take over a character typed with AltGr+Shift+digit: remove the region (or use the tray menu) if that bites. Nab's own keyboard shortcut always wins a clash.
 
 What is open and what is not:
 
