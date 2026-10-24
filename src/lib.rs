@@ -633,6 +633,89 @@ mod smoke {
     }
 
     #[test]
+    fn a_region_can_be_read_again_without_the_selection_screen() {
+        let _serial = serial();
+        unsafe {
+            let host = create_host().unwrap();
+            RegisterClassW(&WNDCLASSW { lpfnWndProc: Some(table_proc), hInstance: instance(), lpszClassName: w!("NabTestTable"), ..Default::default() });
+            let win = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, w!("NabTestTable"), w!(""), WS_POPUP | WS_VISIBLE, 100, 100, 860, 240, None, None, instance(), None).unwrap();
+            let _ = UpdateWindow(win);
+            pump_until(1, || false);
+            sys::set_clipboard("sentinel", None).unwrap();
+
+            // The same box the drag test uses, but read without the selection screen. With no closed
+            // module installed it goes to the clipboard as a table, like any dragged box.
+            let region = ext::ScreenRect { l: 104, t: 104, r: 950, b: 335 };
+            assert!(ext::grab_rect(region));
+            assert!(pump_until(20, || {
+                let c = clipboard();
+                !c.is_empty() && c != "sentinel"
+            }), "nothing was copied; {}", diagnose());
+            let rows: Vec<Vec<String>> = clipboard().lines().map(|l| l.split('\t').map(norm).collect()).collect();
+            let want: Vec<Vec<String>> = TABLE.iter().map(|r| r.iter().map(|c| norm(c)).collect()).collect();
+            assert_eq!(rows, want, "clipboard was {:?}; {}", clipboard(), diagnose());
+
+            // Areas that cannot be read are refused up front rather than failing later.
+            let before = ocr::REPORTS.load(Ordering::SeqCst);
+            assert!(!ext::grab_rect(ext::ScreenRect { l: GetSystemMetrics(SM_XVIRTUALSCREEN) - 50, ..region }), "partly off the screen");
+            assert!(!ext::grab_rect(ext::ScreenRect { r: region.l + 3, ..region }), "too narrow");
+            assert!(!ext::grab_rect(ext::ScreenRect { b: region.t + 3, ..region }), "too short");
+            assert!(!ext::grab_rect(ext::ScreenRect { l: 10, t: 10, r: 5, b: 5 }), "back to front");
+            assert!(capture::start(false));
+            assert!(!ext::grab_rect(region), "not while the selection screen is open (it would read the dimmed screen)");
+            let ov = FindWindowW(w!("NabOverlay"), None).unwrap();
+            SendMessageW(ov, WM_KEYDOWN, WPARAM(VK_ESCAPE.0 as usize), LPARAM(0));
+            pump();
+            pump_until(1, || false);
+            assert_eq!(ocr::REPORTS.load(Ordering::SeqCst), before, "a refused area must not start a read");
+
+            let _ = DestroyWindow(win);
+            let _ = DestroyWindow(host);
+        }
+    }
+
+    #[test]
+    fn picking_a_region_takes_the_box_and_reads_nothing() {
+        let _serial = serial();
+        unsafe {
+            let host = create_host().unwrap();
+
+            // A dragged box is handed to the module (here there is none) and nothing is read.
+            let before = ocr::REPORTS.load(Ordering::SeqCst);
+            assert!(ext::pick_region());
+            let ov = FindWindowW(w!("NabOverlay"), None).unwrap();
+            SendMessageW(ov, WM_LBUTTONDOWN, WPARAM(1), at(20, 20));
+            SendMessageW(ov, WM_MOUSEMOVE, WPARAM(1), at(320, 160));
+            SendMessageW(ov, WM_LBUTTONUP, WPARAM(0), at(320, 160));
+            assert!(!capture::is_open(), "the box closes the selection screen");
+            pump_until(2, || false);
+            assert_eq!(ocr::REPORTS.load(Ordering::SeqCst), before, "picking a region must not read the screen");
+
+            // A click (not a box) while picking does nothing: still open, still waiting for a box.
+            assert!(ext::pick_region());
+            let ov = FindWindowW(w!("NabOverlay"), None).unwrap();
+            SendMessageW(ov, WM_LBUTTONDOWN, WPARAM(1), at(50, 50));
+            SendMessageW(ov, WM_LBUTTONUP, WPARAM(0), at(50, 50));
+            pump_until(2, || false);
+            assert!(capture::is_open(), "a click is not a region");
+            assert_eq!(ocr::REPORTS.load(Ordering::SeqCst), before);
+
+            // Esc cancels picking, and the next ordinary drag is read as usual (the flag is gone).
+            SendMessageW(ov, WM_KEYDOWN, WPARAM(VK_ESCAPE.0 as usize), LPARAM(0));
+            pump();
+            assert!(!capture::is_open());
+            assert!(capture::start(false));
+            let ov = FindWindowW(w!("NabOverlay"), None).unwrap();
+            SendMessageW(ov, WM_LBUTTONDOWN, WPARAM(1), at(0, 0));
+            SendMessageW(ov, WM_MOUSEMOVE, WPARAM(1), at(300, 120));
+            SendMessageW(ov, WM_LBUTTONUP, WPARAM(0), at(300, 120));
+            assert!(pump_until(20, || ocr::REPORTS.load(Ordering::SeqCst) != before), "after Esc, a drag must be read again");
+
+            let _ = DestroyWindow(host);
+        }
+    }
+
+    #[test]
     fn only_a_real_nab_counts_as_the_running_instance() {
         unsafe {
             assert!(is_our_exe(windows::Win32::System::Threading::GetCurrentProcessId()));
