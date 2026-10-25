@@ -4,7 +4,7 @@ Paste these into Partner Center → Store listing (English (United Kingdom); add
 
 ## Product name
 
-Nab
+Nab: Copy Text from Screen  (the reserved name; "Nab" was taken. The app itself is still called Nab in the Start menu and everywhere else.)
 
 ## Short title (if asked)
 

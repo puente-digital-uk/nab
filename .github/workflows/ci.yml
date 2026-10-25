@@ -70,11 +70,13 @@ jobs:
       - name: Build the MSIX (unsigned; the Microsoft Store signs it)
         shell: pwsh
         env:
+          STORE_NAME: ${{ vars.STORE_NAME }}
           STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
           STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
           STORE_PUBLISHER_DISPLAY: ${{ vars.STORE_PUBLISHER_DISPLAY }}
         run: |
           $args = @{ Out = "dist\Nab.msix" }
+          if ($env:STORE_NAME) { $args.StoreName = $env:STORE_NAME }
           if ($env:STORE_IDENTITY_NAME) { $args.IdentityName = $env:STORE_IDENTITY_NAME }
           if ($env:STORE_PUBLISHER) { $args.Publisher = $env:STORE_PUBLISHER }
           if ($env:STORE_PUBLISHER_DISPLAY) { $args.PublisherDisplay = $env:STORE_PUBLISHER_DISPLAY }

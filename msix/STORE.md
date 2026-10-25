@@ -11,13 +11,13 @@ uninstalls cleanly from Settings › Apps. Individual developer registration is 
 
 ## 2. Reserve the name and read off the identity (5 minutes)
 
-1. **Apps and games → New product → MSIX or PWA app**, reserve the name **Nab**.
+1. **Apps and games → New product → MSIX or PWA app**, reserve the name **Nab: Copy Text from Screen** ("Nab" alone was taken). The package must carry that name exactly: set it as the `STORE_NAME` variable below, or pass `-StoreName` to `msix\build.ps1`.
 2. Open the product → **Product management → Product identity**. Copy these three values:
    - **Package/Identity/Name** — e.g. `12345PuenteDigital.Nab`
    - **Package/Identity/Publisher** — e.g. `CN=1A2B3C4D-...`
    - **Package/Properties/PublisherDisplayName** — e.g. `Puente Digital`
 3. In the GitHub repo: **Settings → Secrets and variables → Actions → Variables**, add
-   `STORE_IDENTITY_NAME`, `STORE_PUBLISHER` and `STORE_PUBLISHER_DISPLAY` with those values.
+   `STORE_NAME` (the reserved name), `STORE_IDENTITY_NAME`, `STORE_PUBLISHER` and `STORE_PUBLISHER_DISPLAY` with those values.
    From then on every CI run builds a `Nab.msix` with the right identity (download it from the run's artifacts).
 
 ## 3. Test the package locally before uploading (10 minutes)

@@ -5,8 +5,9 @@
 #
 # Partner Center > Product identity gives the real values for -IdentityName, -Publisher and
 # -PublisherDisplay. Without them the package has placeholder identity and can only be used for
-# local testing.
+# local testing. -StoreName is the reserved name, exactly as reserved.
 param(
+    [string]$StoreName = "Nab: Copy Text from Screen",
     [string]$IdentityName = "PuenteDigital.Nab",
     [string]$Publisher = "CN=Puente Digital (dev)",
     [string]$PublisherDisplay = "Puente Digital",
@@ -46,7 +47,7 @@ New-Item -ItemType Directory -Path (Join-Path $stage "Assets") | Out-Null
 Copy-Item $Exe (Join-Path $stage "nab.exe")
 Copy-Item (Join-Path $PSScriptRoot "Assets\*.png") (Join-Path $stage "Assets")
 $manifest = Get-Content (Join-Path $PSScriptRoot "AppxManifest.xml") -Raw
-$manifest = $manifest.Replace("{{IDENTITY_NAME}}", $IdentityName).Replace("{{PUBLISHER}}", $Publisher).Replace("{{PUBLISHER_DISPLAY}}", $PublisherDisplay).Replace("{{VERSION}}", $version)
+$manifest = $manifest.Replace("{{STORE_NAME}}", [Security.SecurityElement]::Escape($StoreName)).Replace("{{IDENTITY_NAME}}", $IdentityName).Replace("{{PUBLISHER}}", $Publisher).Replace("{{PUBLISHER_DISPLAY}}", $PublisherDisplay).Replace("{{VERSION}}", $version)
 [IO.File]::WriteAllText((Join-Path $stage "AppxManifest.xml"), $manifest, (New-Object Text.UTF8Encoding $false))
 
 # Resource index, so Assets\X.png resolves to X.scale-100.png / X.scale-200.png etc.
