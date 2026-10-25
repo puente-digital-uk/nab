@@ -13,7 +13,7 @@ categories = ["gui", "os::windows-apis"]
 publish = false
 
 [dependencies]
-windows = { version = "0.58", features = [
+windows = { version = "0.62", features = [
     "ApplicationModel",
     "ApplicationModel_Activation",
     "Foundation",
