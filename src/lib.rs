@@ -586,11 +586,14 @@ mod smoke {
         let _serial = serial();
         unsafe {
             let host = create_host().unwrap();
-            let (win, font) = show_text("", 100, 100, 600, 300); // blank white area
+            // Blank by construction: a plain window over the whole virtual screen, as in
+            // click_on_text_copies_that_block. A small one left the CI runner's console in shot.
+            let (x, y) = (GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN));
+            let (w, h) = (GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+            let (win, font) = show_text("", x, y, w, h);
             assert!(capture::start(false));
             let ov = FindWindowW(w!("NabOverlay"), None).unwrap();
-            let (ox, oy) = (GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN));
-            let (cx, cy) = (400 - ox, 250 - oy);
+            let (cx, cy) = (w / 2, h / 2); // overlay client coordinates start at the virtual screen's corner
             SendMessageW(ov, WM_LBUTTONDOWN, WPARAM(1), at(cx, cy));
             SendMessageW(ov, WM_LBUTTONUP, WPARAM(0), at(cx, cy));
             pump_until(15, || false); // let the scan finish
