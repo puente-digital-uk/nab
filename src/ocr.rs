@@ -591,7 +591,8 @@ mod tests {
         assert_eq!(plain.text, "90/0");
 
         // The number repairs run down the same columns, and the pasted text is rebuilt with them.
-        let rows = vec![row(&["District", "Mains", "Losses"]), row(&["Eastbrook", "1,284", "12 4"]), row(&["Pinner Reach", "1.533", "15.6"]), row(&["Oldcastle", "968", "9.2"])];
+        // Two commas outvote the one dot (one each would be no evidence either way).
+        let rows = vec![row(&["District", "Mains", "Losses"]), row(&["Eastbrook", "1,284", "12 4"]), row(&["Pinner Reach", "1.533", "15.6"]), row(&["Oldcastle", "968", "9.2"]), row(&["Ashford", "2,047", "11.8"])];
         let mut g = Grab { text: blocks::tsv(&rows), table: Some(rows) };
         columns_cleaned(&mut g);
         let t = g.table.as_ref().unwrap();
