@@ -11,13 +11,13 @@ uninstalls cleanly from Settings › Apps. Individual developer registration is 
 
 ## 2. Reserve the name and read off the identity (5 minutes)
 
-1. **Apps and games → New product → MSIX or PWA app**, reserve the name **Nab**.
+1. **Apps and games → New product → MSIX or PWA app**, reserve the name **Nab: Copy Text from Screen** ("Nab" alone was taken). The package must carry that name exactly: set it as the `STORE_NAME` variable below, or pass `-StoreName` to `msix\build.ps1`.
 2. Open the product → **Product management → Product identity**. Copy these three values:
    - **Package/Identity/Name** — e.g. `12345PuenteDigital.Nab`
    - **Package/Identity/Publisher** — e.g. `CN=1A2B3C4D-...`
    - **Package/Properties/PublisherDisplayName** — e.g. `Puente Digital`
 3. In the GitHub repo: **Settings → Secrets and variables → Actions → Variables**, add
-   `STORE_IDENTITY_NAME`, `STORE_PUBLISHER` and `STORE_PUBLISHER_DISPLAY` with those values.
+   `STORE_NAME` (the reserved name), `STORE_IDENTITY_NAME`, `STORE_PUBLISHER` and `STORE_PUBLISHER_DISPLAY` with those values.
    From then on every CI run builds a `Nab.msix` with the right identity (download it from the run's artifacts).
 
 ## 3. Test the package locally before uploading (10 minutes)
@@ -41,8 +41,9 @@ Run the Windows App Certification Kit too if you have the SDK (`appcert.exe test
 1. Partner Center → the product → **Start your submission**.
 2. **Packages:** upload the **unsigned** `Nab.msix` from the CI artifact (built with the Store identity from step 2). Don't upload a dev-signed one.
 3. **Properties:** category **Productivity**; privacy policy URL `https://github.com/puente-digital-uk/nab/blob/main/PRIVACY.md`; website `https://www.puentedigital.co.uk/`; support contact `hello@puentedigital.co.uk`.
-4. **Age ratings:** answer the questionnaire (no user-generated content, no purchases, no personal data) → it comes out as "3+" / "Everyone".
+4. **Age ratings:** answer the questionnaire (no user-generated content, no personal data; say that the app offers in-app purchases once Nab Pro is live) → it comes out as "3+" / "Everyone".
 5. **Pricing and availability:** Free, all markets.
+   **Nab Pro (add-on):** only after the app itself is published. Partner Center → the app → **Add-ons → New add-on**: type **Durable**, product ID exactly `nab_pro` (the app finds the licence by this ID), no expiry, one-off price of £4.99 (decided 2026-10-25). Copy the add-on's **Store ID** (12 characters) into the private build as the `NAB_PRO_STORE_ID` variable. Price changes and sales must follow Store policy 10.8.7.
 6. **Store listing:** paste from [listing.md](listing.md). Screenshots: at least one, 1366×768 or larger PNG. Take the settings window on a plain desktop, the overlay with a block highlighted, and a table pasted into Excel.
 7. **Submission options → Notes for certification:** paste the note from listing.md (what the shortcuts do, that it's offline, how to test it).
 8. Submit. Certification usually takes 1–3 business days. Fix anything they flag and resubmit.
@@ -55,3 +56,11 @@ Run the Windows App Certification Kit too if you have the SDK (`appcert.exe test
 ## Later: signing the GitHub .exe too
 
 Once the project has a release history, apply to **SignPath Foundation** (free code signing for open source: https://signpath.org). It needs: MFA on the GitHub account, a "Code signing policy" section in the README naming the maintainer roles, the privacy policy (done), and builds that are reproducible from the public source (done: CI builds from the tag). With that, the `.exe` on GitHub is signed as well and SmartScreen reputation builds from there.
+
+## Nab Pro: which package goes to the Store
+
+The Microsoft Store has one package per listing. Once Nab Pro exists, **the Store package comes from the private `nab-pro` repository's workflow, not from this repository's CI**: it links this open code at a tag together with the closed module. This repository's CI still builds an unsigned `Nab.msix` (the free tool alone); use it for local testing and for the very first submission, never after Pro ships, or users would be updated to a build without Pro.
+
+How the Store version is chosen: the private workflow takes the version from the tag of this repository it was built against, so a Pro-only fix needs a (possibly empty) patch release here.
+
+Testing the purchase needs the real Store: Windows has no simulator for `Windows.Services.Store`. Publish the app (it can be hidden from search), add the `nab_pro` add-on, install the app **from the Store** on the test PC, run it once, then run the dev build; see Microsoft's "In-app purchases and trials" testing section. A dev-signed MSIX cannot prove the purchase works.

@@ -17,6 +17,8 @@ use crate::{shortcuts, sys};
 
 const CLASS: PCWSTR = w!("NabHome");
 const SIZE: (i32, i32) = (440, 508);
+/// What the closed module's card adds to the window's height, in 96-dpi units (nothing in the free tool).
+const CARD_EXTRA: i32 = 64;
 const WM_MOUSELEAVE: u32 = 0x02A3; // not exported by windows-rs under these features
 const STYLE: WINDOW_STYLE = WINDOW_STYLE(WS_OVERLAPPED.0 | WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0);
 
@@ -43,8 +45,9 @@ enum Hit {
     Autostart,
     Site,
     Source,
+    Pro, // the button on the closed module's card, if it has one
 }
-const HITS: [Hit; 8] = [Hit::ChangeMouse, Hit::ChangeKey, Hit::Info, Hit::Grab, Hit::Coffee, Hit::Autostart, Hit::Site, Hit::Source];
+const HITS: [Hit; 9] = [Hit::ChangeMouse, Hit::ChangeKey, Hit::Info, Hit::Grab, Hit::Coffee, Hit::Autostart, Hit::Site, Hit::Source, Hit::Pro];
 
 /// Which shortcut the user is currently choosing.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -65,17 +68,45 @@ struct Home {
 thread_local!(static HOME: RefCell<Option<Home>> = const { RefCell::new(None) });
 static TOLD_ABOUT_TRAY: AtomicBool = AtomicBool::new(false);
 
+/// The closed module's card, if one is installed. Cheap: it is read on every paint and mouse move.
+fn card() -> Option<crate::ext::Card> {
+    crate::ext::pro().card()
+}
+
+/// Whether the window was made with room for the card. Decided once, when it opens, so the layout
+/// can't change under it if a module's card comes and goes.
+static HAS_CARD: AtomicBool = AtomicBool::new(false);
+
+/// How much taller the window is for the card: nothing in the free tool.
+fn extra() -> i32 {
+    if HAS_CARD.load(Ordering::SeqCst) {
+        CARD_EXTRA
+    } else {
+        0
+    }
+}
+
+fn size() -> (i32, i32) {
+    (SIZE.0, SIZE.1 + extra())
+}
+
 /// Layout in 96-dpi units (left, top, right, bottom).
 fn area(h: Hit) -> (i32, i32, i32, i32) {
+    area_at(h, extra())
+}
+
+/// `area` for a window `dy` units taller than the free tool's (the card is there when `dy` is not 0).
+fn area_at(h: Hit, dy: i32) -> (i32, i32, i32, i32) {
     match h {
         Hit::ChangeMouse => (332, 118, 396, 150),
         Hit::ChangeKey => (332, 170, 396, 202),
         Hit::Info => (128, 264, 146, 282),
-        Hit::Grab => (32, 346, 408, 390),
-        Hit::Autostart => (32, 408, 240, 430),
-        Hit::Coffee => (268, 404, 408, 434), // small, out of the way of the main button
-        Hit::Site => (32, 464, 290, 492),
-        Hit::Source => (300, 464, 408, 492),
+        Hit::Pro => (292, 352, 392, 388), // on the card, which sits between the time saved and the buttons
+        Hit::Grab => (32, 346 + dy, 408, 390 + dy),
+        Hit::Autostart => (32, 408 + dy, 240, 430 + dy),
+        Hit::Coffee => (268, 404 + dy, 408, 434 + dy), // small, out of the way of the main button
+        Hit::Site => (32, 464 + dy, 290, 492 + dy),
+        Hit::Source => (300, 464 + dy, 408, 492 + dy),
     }
 }
 
@@ -104,8 +135,9 @@ pub fn show() {
             let _ = SetForegroundWindow(hwnd);
             return;
         }
+        HAS_CARD.store(card().is_some(), Ordering::SeqCst);
         let dpi = GetDpiForSystem() as i32;
-        let mut r = scaled(dpi, (0, 0, SIZE.0, SIZE.1));
+        let mut r = scaled(dpi, (0, 0, size().0, size().1));
         let _ = AdjustWindowRectExForDpi(&mut r, STYLE, false, WINDOW_EX_STYLE(0), dpi as u32);
         let (w, h) = (r.right - r.left, r.bottom - r.top);
         let (x, y) = ((GetSystemMetrics(SM_CXSCREEN) - w) / 2, (GetSystemMetrics(SM_CYSCREEN) - h) / 2);
@@ -115,7 +147,7 @@ pub fn show() {
         // The system DPI can be stale (scaling changed without signing out); use the real one.
         let real = GetDpiForWindow(hwnd) as i32;
         let dpi = if real > 0 && real != dpi {
-            let mut r = scaled(real, (0, 0, SIZE.0, SIZE.1));
+            let mut r = scaled(real, (0, 0, size().0, size().1));
             let _ = AdjustWindowRectExForDpi(&mut r, STYLE, false, WINDOW_EX_STYLE(0), real as u32);
             let (w, h) = (r.right - r.left, r.bottom - r.top);
             let (x, y) = ((GetSystemMetrics(SM_CXSCREEN) - w) / 2, (GetSystemMetrics(SM_CYSCREEN) - h) / 2);
@@ -141,7 +173,8 @@ pub fn refresh() {
 
 fn hit_test(dpi: i32, lp: LPARAM) -> Option<Hit> {
     let (x, y) = crate::logic::unpack_point(lp.0);
-    HITS.into_iter().find(|&h| {
+    let has_button = extra() > 0 && card().is_some_and(|c| c.button.is_some());
+    HITS.into_iter().filter(|&h| h != Hit::Pro || has_button).find(|&h| {
         let r = scaled(dpi, area(h));
         x >= r.left && x < r.right && y >= r.top && y < r.bottom
     })
@@ -210,6 +243,7 @@ fn act(hwnd: HWND, h: Hit) {
             let _ = SetTimer(crate::host(), crate::TIMER_GRAB, 250, None);
         },
         Hit::Info => {} // hover does the work
+        Hit::Pro => crate::ext::pro().card_action(hwnd),
         Hit::Coffee => sys::open(crate::COFFEE),
         Hit::Site => sys::open(crate::SITE),
         Hit::Source => sys::open(crate::REPO),
@@ -326,7 +360,7 @@ extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT
                 let new_dpi = ((wp.0 >> 16) & 0xffff) as i32;
                 if (48..=960).contains(&new_dpi) {
                     with(|h| h.dpi = new_dpi);
-                    let mut r = scaled(new_dpi, (0, 0, SIZE.0, SIZE.1));
+                    let mut r = scaled(new_dpi, (0, 0, size().0, size().1));
                     let _ = AdjustWindowRectExForDpi(&mut r, STYLE, false, WINDOW_EX_STYLE(0), new_dpi as u32);
                     let _ = SetWindowPos(hwnd, None, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE);
                     redraw(hwnd);
@@ -507,6 +541,20 @@ It's an estimate: nothing is measured, and nothing is sent anywhere.";
         });
     }
 
+    // The closed module's card, if there is one
+    let dy = extra();
+    if let Some(card) = card() {
+        fill(dc, r(32, 342, 408, 398), CARD, s(14), Some(LINE));
+        let right = if card.button.is_some() { 284 } else { 392 };
+        text(dc, &card.title, s(14), 700, TEXT, r(50, 348, right, 370), DT_LEFT);
+        text(dc, &card.line, s(12), 400, MUTED, r(50, 370, right, 392), DT_LEFT);
+        if let Some(label) = card.button {
+            let b = scaled(dpi, area(Hit::Pro));
+            fill(dc, b, if hover == Some(Hit::Pro) { BLUE.1 } else { BLUE.0 }, s(10), None);
+            text(dc, &label, s(13), 600, TEXT, b, DT_CENTER);
+        }
+    }
+
     // Buttons
     let pick = |h: Hit, c: (COLORREF, COLORREF)| if hover == Some(h) { c.1 } else { c.0 };
     let grab = scaled(dpi, area(Hit::Grab));
@@ -527,7 +575,7 @@ It's an estimate: nothing is measured, and nothing is sent anywhere.";
     text(dc, "Start with Windows", s(14), 400, TEXT, RECT { left: boxr.right + s(10), ..auto }, DT_LEFT);
 
     // Footer
-    FillRect(dc, &r(32, 450, 408, 451), sep);
+    FillRect(dc, &r(32, 450 + dy, 408, 451 + dy), sep);
     let _ = DeleteObject(sep);
     let site = scaled(dpi, area(Hit::Site));
     let wfree = text(dc, "Free, by ", s(13), 400, MUTED, site, DT_LEFT);
@@ -544,26 +592,46 @@ It's an estimate: nothing is measured, and nothing is sent anywhere.";
 mod tests {
     use super::*;
 
+    /// The hit areas of a window `dy` taller than the free one: all of them with the card's button.
+    fn hits(dy: i32) -> Vec<Hit> {
+        HITS.into_iter().filter(|&h| h != Hit::Pro || dy > 0).collect()
+    }
+
     #[test]
     fn layout_hit_areas_do_not_overlap() {
-        for (i, a) in HITS.iter().enumerate() {
-            for b in &HITS[i + 1..] {
-                let (x, y) = (scaled(96, area(*a)), scaled(96, area(*b)));
-                let overlap = x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
-                assert!(!overlap, "{a:?} overlaps {b:?}");
+        for dy in [0, CARD_EXTRA] {
+            let all = hits(dy);
+            for (i, a) in all.iter().enumerate() {
+                for b in &all[i + 1..] {
+                    let (x, y) = (scaled(96, area_at(*a, dy)), scaled(96, area_at(*b, dy)));
+                    let overlap = x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
+                    assert!(!overlap, "{a:?} overlaps {b:?} (card height {dy})");
+                }
+                let r = area_at(*a, dy);
+                assert!(r.0 >= 0 && r.2 <= SIZE.0 && r.1 >= 0 && r.3 <= SIZE.1 + dy, "{a:?} is outside the window (card height {dy})");
             }
-            let r = area(*a);
-            assert!(r.0 >= 0 && r.2 <= SIZE.0 && r.1 >= 0 && r.3 <= SIZE.1, "{a:?} is outside the window");
         }
     }
 
     #[test]
+    fn the_free_window_is_the_size_it_always_was() {
+        assert_eq!(extra(), 0, "no closed module is installed in the tests");
+        assert_eq!(size(), (440, 508));
+        assert_eq!(area(Hit::Grab), (32, 346, 408, 390));
+        assert_eq!(area(Hit::Source), (300, 464, 408, 492));
+    }
+
+    #[test]
     fn hit_test_finds_each_area() {
-        for h in HITS {
+        for h in hits(0) {
             let r = scaled(144, area(h)); // 150% scaling
             let lp = LPARAM(crate::logic::pack_point((r.left + r.right) / 2, (r.top + r.bottom) / 2));
             assert_eq!(hit_test(144, lp), Some(h));
         }
         assert_eq!(hit_test(96, LPARAM(crate::logic::pack_point(2, 2))), None);
+        // Without a card there is no card button to hit, even at its coordinates.
+        let r = scaled(96, area_at(Hit::Pro, CARD_EXTRA));
+        let lp = LPARAM(crate::logic::pack_point((r.left + r.right) / 2, (r.top + r.bottom) / 2));
+        assert_ne!(hit_test(96, lp), Some(Hit::Pro));
     }
 }

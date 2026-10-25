@@ -25,6 +25,8 @@ const ACCENT: COLORREF = COLORREF(0x00EB6325); // #2563EB (GDI colours are BGR)
 const PICKED: COLORREF = COLORREF(0x005EC522); // #22C55E
 const ESC_HOTKEY: i32 = 2; // works even if Windows refuses to give the overlay focus
 const TIMER_CLOSE: usize = 1;
+/// Smallest box worth saving as a region or re-reading (smaller than this is a slip of the hand).
+const MIN_REGION_PX: i32 = 8;
 const DRAG_PX: i32 = 5; // moved less than this between press and release = a click
 
 /// A 32-bit top-down DIB we can draw on with GDI *and* read/write as plain memory.
@@ -103,6 +105,8 @@ static GEN: AtomicU32 = AtomicU32::new(0);
 static PENDING: Mutex<Option<Job>> = Mutex::new(None);
 static WAKE: Condvar = Condvar::new();
 static WORKER: AtomicBool = AtomicBool::new(false);
+/// The next dragged box is handed to the closed module (`ext::pick_region`) instead of being read.
+static PICK: AtomicBool = AtomicBool::new(false);
 /// How often an overlay lost focus (and so closed itself): lets tests explain a failure.
 #[cfg(test)]
 pub static DEACTIVATED: AtomicU32 = AtomicU32::new(0);
@@ -120,6 +124,41 @@ pub fn register(inst: HINSTANCE) {
 
 pub fn is_open() -> bool {
     SNAP.with(|s| s.borrow().is_some())
+}
+
+/// Open the selection screen to pick a region for the closed module (see `ext`).
+pub fn pick_region() -> bool {
+    if is_open() {
+        return false; // someone's own grab is on screen: it must stay theirs, not turn into a picker
+    }
+    PICK.store(true, Ordering::SeqCst);
+    let ok = unsafe { start(false) };
+    if !ok {
+        PICK.store(false, Ordering::SeqCst);
+    }
+    ok
+}
+
+/// Read a rectangle of the live screen, as a dragged box would be, and deliver it like any grab.
+pub fn grab_rect(r: crate::ext::ScreenRect) -> bool {
+    let (Some(w), Some(h)) = (r.r.checked_sub(r.l), r.b.checked_sub(r.t)) else { return false };
+    let bounds = crate::ext::screen_bounds();
+    let inside = r.l >= bounds.l && r.t >= bounds.t && r.r <= bounds.r && r.b <= bounds.b;
+    if is_open() || ocr::busy() || !inside || w < MIN_REGION_PX || h < MIN_REGION_PX {
+        return false; // (busy: don't capture what the reader would refuse anyway)
+    }
+    unsafe {
+        let Some(shot) = Surface::new(w, h) else { return false };
+        let screen = GetDC(None);
+        let copied = BitBlt(shot.dc, 0, 0, w, h, screen, r.l, r.t, SRCCOPY | CAPTUREBLT).is_ok();
+        ReleaseDC(None, screen);
+        let _ = GdiFlush();
+        if !copied {
+            return false;
+        }
+        ocr::spawn(copy_out(&shot, w, &Rect::new(0, 0, w, h)), w as u32, h as u32, None);
+    }
+    true
 }
 
 fn bmi(w: i32, h: i32) -> BITMAPINFO {
@@ -185,7 +224,7 @@ pub unsafe fn start(close_on_miss: bool) -> bool {
     let len = w as usize * h as usize * 4;
     std::ptr::copy_nonoverlapping(bright.bits, dim.bits, len);
     logic::dim(std::slice::from_raw_parts_mut(dim.bits, len), 45);
-    draw_hint(dim.dc, -x, -y); // primary monitor's top-left in overlay coordinates
+    draw_hint(dim.dc, -x, -y, PICK.load(Ordering::SeqCst)); // primary monitor's top-left in overlay coordinates
 
     // Monitors, the one under the pointer first, so a click there is answered soonest.
     let mut rects: Vec<Rect> = vec![];
@@ -276,7 +315,7 @@ fn scan_worker() {
 }
 
 /// "Click on text or drag a box · Esc to cancel" pill, near the top of the primary monitor.
-unsafe fn draw_hint(dc: HDC, px: i32, py: i32) {
+unsafe fn draw_hint(dc: HDC, px: i32, py: i32, pick: bool) {
     let mon = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
     let (mut dx, mut dy) = (96u32, 96u32);
     let _ = GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &mut dx, &mut dy);
@@ -295,7 +334,8 @@ unsafe fn draw_hint(dc: HDC, px: i32, py: i32) {
     let _ = DeleteObject(pen);
 
     SetBkMode(dc, TRANSPARENT);
-    text(dc, "Click on text, or drag a box  ·  Esc to cancel", sc(16), 600, COLORREF(0x00FFFFFF), RECT { top: r.top + sc(8), bottom: r.top + sc(34), ..r });
+    let line = if pick { "Drag a box around the region to save  ·  Esc to cancel" } else { "Click on text, or drag a box  ·  Esc to cancel" };
+    text(dc, line, sc(16), 600, COLORREF(0x00FFFFFF), RECT { top: r.top + sc(8), bottom: r.top + sc(34), ..r });
     text(dc, "Nab · free by Puente Digital", sc(12), 400, COLORREF(0x00B8A99A), RECT { top: r.top + sc(32), bottom: r.bottom - sc(4), ..r });
 }
 
@@ -325,6 +365,7 @@ unsafe fn invalidate(hwnd: HWND, r: Option<Rect>) {
 
 /// Free everything, then close the window. Safe to call more than once.
 unsafe fn close() {
+    PICK.store(false, Ordering::SeqCst); // Esc, right-click or a lost focus cancels picking a region
     if let Some(s) = SNAP.with(|s| s.borrow_mut().take()) {
         GEN.fetch_add(1, Ordering::SeqCst); // tells its scan thread to stop
         let _ = UnregisterHotKey(s.hwnd, ESC_HOTKEY);
@@ -371,6 +412,7 @@ enum Then {
     Nothing,
     Close,
     Read(Vec<u8>, u32, u32, Option<Grab>),
+    Region(crate::ext::ScreenRect), // a box for the closed module, not to be read
     Miss(String),   // close and say why nothing was copied
     Notify(String), // stay open, tell the user something (OCR failed)
 }
@@ -390,9 +432,16 @@ pub unsafe fn release(x: i32, y: i32) {
                 return if s.close_on_miss { Then::Close } else { Then::Nothing };
             };
             let r = Rect::new(sx as i32, sy as i32, (sx + sw) as i32, (sy + sh) as i32);
+            if PICK.swap(false, Ordering::SeqCst) {
+                let (ox, oy) = s.origin;
+                return Then::Region(crate::ext::ScreenRect { l: ox + r.l, t: oy + r.t, r: ox + r.r, b: oy + r.b });
+            }
             return Then::Read(copy_out(&s.bright, s.w, &r), sw, sh, None);
         }
         invalidate(s.hwnd, Some(sel_rect(a, s.cur)));
+        if PICK.load(Ordering::SeqCst) {
+            return Then::Nothing; // choosing a region: only a dragged box counts
+        }
         s.pending = Some((x, y));
         resolve(s)
     });
@@ -444,6 +493,10 @@ unsafe fn finish(then: Then) {
                 close();
             }
             ocr::spawn(px, w, h, fallback);
+        }
+        Then::Region(region) => {
+            close();
+            crate::ext::pro().region_picked(region);
         }
         Then::Miss(why) => {
             close();

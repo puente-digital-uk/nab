@@ -35,13 +35,16 @@ Text stuck in an image, a video, a screenshot, a PDF that won't let you select, 
 - **Counts what it saves.** Text you can't select usually means: screenshot it, paste it into an OCR or AI tool, wait, copy the result, come back. Nab is one click. It counts each copy as about 20 seconds and 5 steps saved (a minute and 7 steps for a table) and keeps a running total.
 - **Tiny.** One small `.exe`, no installer, no runtime, no downloads. It sits quietly in the tray.
 - **Any language Windows supports.** It reads in your Windows display languages.
-- **Free and open source** (MIT).
+- **Free, and open source at its core** (MIT). Everything above is free, permanently. An optional paid add-on exists; see [Free and Pro](#free-and-pro).
 
 > **Beta.** Nab works and is used every day, but it's new: expect rough edges, and please [report](../../issues) what you hit. Releases stay marked "pre-release" until 1.0.
+>
+> **Check numbers from small or scanned sources.** At low resolution a comma and a full stop are a pixel apart, so a figure can come back wrong in a way that still looks plausible (`1,533` as `1.533`). Nab now repairs the common cases using the rest of the column as evidence, but the OCR is only as good as the pixels: if the text is small, zoom in before you nab it, and check the figures that matter.
 
 ## Install
 
 1. Download `nab.exe` from the latest [release](../../releases). Put it wherever you like (Documents, a tools folder); there is no installer.
+   *Download blocked?* Take `nab.zip` from the same release instead — the same exe, zipped. See [Is this safe?](#is-this-safe) below.
 2. Run it. If Windows SmartScreen says it *prevented an unrecognised app from starting*, click **More info → Run anyway**. That warning appears because this build isn't code-signed yet, not because anything is wrong with it. You can check the file against the SHA-256 in the release notes: `Get-FileHash nab.exe` in PowerShell.
 3. Nab's window opens once and then sits in the tray (the **N** icon near the clock). Tick **Start with Windows** if you want it always there.
 
@@ -72,13 +75,52 @@ Press **Delete** to turn a shortcut off, or **Esc** to cancel. Your choice is sa
 
 > The mouse shortcut takes over that click everywhere while Nab runs. If an app you use needs Ctrl+Shift+click (some browsers use it to open a link in a new tab), pick something else, such as Ctrl+Alt+click or Ctrl+middle click.
 
+## Is this safe?
+
+Your browser, SmartScreen or your antivirus may object to downloading or running `nab.exe`. That is about **reputation, not detection**: a brand-new executable, downloaded a handful of times and not yet code-signed, has nothing for a reputation engine to go on, so some filters block it on principle. Nothing in the free Nab connects to the internet — there is no network code in it at all.
+
+Rather than ask you to take that on trust, here is how to check for yourself, in about a minute:
+
+```powershell
+# 1. The file is byte-for-byte the one this project published
+Get-FileHash nab.exe        # compare with SHA256SUMS.txt in the release
+
+# 2. It was built by this repo's CI, from this tag, and not touched since
+gh attestation verify nab.exe --owner puente-digital-uk
+```
+
+The second one is the strong check: it verifies a signed build-provenance attestation, so it proves the exe came out of [the public workflow](.github/workflows/ci.yml) at a specific commit — not from someone's laptop. Each release also links a VirusTotal scan of that exact file, and you can always [build it yourself](#build-from-source) and compare.
+
+The permanent fix is code signing, and it is on the way: a Microsoft Store build (signed by Microsoft, no warning at all) is in preparation, and the GitHub `.exe` follows once the project qualifies for free open-source signing. Until then, the checks above are how you verify rather than trust.
+
+## Free and Pro
+
+Nab is **open core**. The tool in this repository is MIT-licensed and complete: click to copy, drag a box, tables that paste into Excel as real cells, paragraph reflow, Alt+Space and configurable shortcuts. None of that will ever move behind a payment, and nothing that is free today is taken away.
+
+**Nab Pro** is a separate, closed-source add-on, sold once (no subscription) on the Microsoft Store. It adds a data workflow on top:
+
+- **Append mode:** several grabs build up into one paste. Tables stack as rows (a repeated header row is dropped), and the whole lot is on the clipboard after every grab.
+- **Save as CSV or Excel (.xlsx):** the appended grabs straight to a file, without opening Excel first.
+- **Saved regions:** name a box on the screen once, then grab it again with one hotkey (Ctrl+Alt+Shift+1 to 9). A region is remembered in screen pixels, so save it again after changing your resolution, scaling or monitor layout. On keyboard layouts where AltGr counts as Ctrl+Alt, a region's hotkey can take over a character typed with AltGr+Shift+digit: remove the region (or use the tray menu) if that bites. Nab's own keyboard shortcut always wins a clash.
+
+What is open and what is not:
+
+| | Where | Licence |
+|---|---|---|
+| The free tool (this repository) | GitHub download and Microsoft Store | MIT |
+| Nab Pro (append, export, regions) | Microsoft Store only | Closed source, bought in the app or the Store |
+
+The Store version is this same open code plus the Pro module, built privately and signed by Microsoft. The GitHub download does not contain Pro and never will. The single place where the two meet is [`src/ext.rs`](src/ext.rs), so you can see exactly what a closed module is able to do.
+
+Pro asks Windows whether you own it. Windows may contact the Microsoft Store to answer; if it can't (you're offline, the Store is down), Nab simply carries on as the free tool, exactly as before. Pro adds no account, no analytics and no telemetry. See [PRIVACY.md](PRIVACY.md).
+
 ## Safe to run
 
-Nab reads your screen and writes to your clipboard, so it's held to a higher bar than a toy. Every push is checked by cargo-deny (dependency advisories and licences), GitHub CodeQL and OpenSSF Scorecard; every release's `nab.exe` is scanned by VirusTotal with the result linked in the release notes, and its SHA-256 is published alongside it. The exe is built from the tagged source by GitHub Actions, with Control Flow Guard and a statically linked runtime, and it has no network code at all. Details, and how to report a problem, in [SECURITY.md](SECURITY.md).
+Nab reads your screen and writes to your clipboard, so it's held to a higher bar than a toy. Every push is checked by cargo-deny (dependency advisories and licences), GitHub CodeQL and OpenSSF Scorecard; every release's `nab.exe` is scanned by VirusTotal with the result linked in the release notes, and its SHA-256 is published alongside it. The exe is built from the tagged source by GitHub Actions, with Control Flow Guard and a statically linked runtime, and the free build has no network code at all. Details, and how to report a problem, in [SECURITY.md](SECURITY.md).
 
 ## Private
 
-Nab never connects to the internet. The text it reads stays on your PC: it uses the OCR engine built into Windows, keeps its settings and the time-saved counter in your user registry, and the only outgoing links are the ones you click in its window (this page, Puente Digital, Buy me a coffee). No account, no analytics, no crash reporting. Details in [PRIVACY.md](PRIVACY.md).
+The free Nab never connects to the internet (the paid add-on only asks Windows whether you own it; see [Free and Pro](#free-and-pro)). The text it reads stays on your PC: it uses the OCR engine built into Windows, keeps its settings and the time-saved counter in your user registry, and the only outgoing links are the ones you click in its window (this page, Puente Digital, Buy me a coffee). No account, no analytics, no crash reporting. Details in [PRIVACY.md](PRIVACY.md).
 
 ## Build from source
 
@@ -101,7 +143,9 @@ The tests run against Windows itself. They draw text and read it back with the r
 
 | File | What it does |
 |---|---|
-| `src/main.rs` | Tray icon, single instance, message loop |
+| `src/main.rs` | The `nab` program: starts the library below with no closed module |
+| `src/lib.rs` | Tray icon, single instance, message loop |
+| `src/ext.rs` | The one place an optional closed module (Nab Pro) plugs in; every hook does nothing without one |
 | `src/shortcuts.rs` | Keyboard hotkey and the mouse shortcut (a low-level mouse hook on its own thread) |
 | `src/capture.rs` | Freezes every monitor, finds text blocks in the background, hover / click / drag |
 | `src/blocks.rs` | Groups OCR words into lines, blocks and tables; joins wrapped lines back into paragraphs |
@@ -122,7 +166,7 @@ Pushing a `v*` tag that matches the version in `Cargo.toml` makes GitHub Actions
 .\msix\install-dev.ps1       # install it (asks for admin once, to trust the test certificate)
 ```
 
-See [msix/STORE.md](msix/STORE.md) for the Store submission steps.
+See [msix/STORE.md](msix/STORE.md) for the Store submission steps. The Store build that includes Nab Pro is made from a tag of this repository plus the closed module, in a separate private workflow, so for the Store version "built from the public tag" holds for the free part only; the Store signs the result.
 
 ## Support
 

@@ -5,13 +5,15 @@
 #
 # Partner Center > Product identity gives the real values for -IdentityName, -Publisher and
 # -PublisherDisplay. Without them the package has placeholder identity and can only be used for
-# local testing.
+# local testing. -StoreName is the reserved name, exactly as reserved.
 param(
+    [string]$StoreName = "Nab: Copy Text from Screen",
     [string]$IdentityName = "PuenteDigital.Nab",
     [string]$Publisher = "CN=Puente Digital (dev)",
     [string]$PublisherDisplay = "Puente Digital",
     [string]$Exe = "target\release\nab.exe",
     [string]$Out = "dist\Nab.msix",
+    [string]$Version = "",   # x.y.z; default is Cargo.toml's. A build that links a closed module passes its own.
     [switch]$DevSign
 )
 $ErrorActionPreference = "Stop"
@@ -20,9 +22,13 @@ Set-Location $root
 
 if (-not (Test-Path $Exe)) { throw "No $Exe - run .\build.ps1 first." }
 
-# Version: Cargo.toml's x.y.z becomes x.y.z.0 (the Store requires the 4th part to be 0).
-$cargo = Get-Content Cargo.toml -Raw
-if ($cargo -notmatch '(?m)^version = "(\d+)\.(\d+)\.(\d+)"') { throw "Can't read the version from Cargo.toml" }
+# Version: x.y.z becomes x.y.z.0 (the Store requires the 4th part to be 0). Cargo.toml's unless given.
+if (-not $Version) {
+    $cargo = Get-Content Cargo.toml -Raw
+    if ($cargo -notmatch '(?m)^version = "(\d+\.\d+\.\d+)"') { throw "Can't read the version from Cargo.toml" }
+    $Version = $Matches[1]
+}
+if ($Version -notmatch '^(\d+)\.(\d+)\.(\d+)$') { throw "Version must look like 1.2.3, not '$Version'" }
 $version = "$($Matches[1]).$($Matches[2]).$($Matches[3]).0"
 
 # Windows SDK tools (any installed SDK; the newest wins).
@@ -41,7 +47,7 @@ New-Item -ItemType Directory -Path (Join-Path $stage "Assets") | Out-Null
 Copy-Item $Exe (Join-Path $stage "nab.exe")
 Copy-Item (Join-Path $PSScriptRoot "Assets\*.png") (Join-Path $stage "Assets")
 $manifest = Get-Content (Join-Path $PSScriptRoot "AppxManifest.xml") -Raw
-$manifest = $manifest.Replace("{{IDENTITY_NAME}}", $IdentityName).Replace("{{PUBLISHER}}", $Publisher).Replace("{{PUBLISHER_DISPLAY}}", $PublisherDisplay).Replace("{{VERSION}}", $version)
+$manifest = $manifest.Replace("{{STORE_NAME}}", [Security.SecurityElement]::Escape($StoreName)).Replace("{{IDENTITY_NAME}}", $IdentityName).Replace("{{PUBLISHER}}", $Publisher).Replace("{{PUBLISHER_DISPLAY}}", $PublisherDisplay).Replace("{{VERSION}}", $version)
 [IO.File]::WriteAllText((Join-Path $stage "AppxManifest.xml"), $manifest, (New-Object Text.UTF8Encoding $false))
 
 # Resource index, so Assets\X.png resolves to X.scale-100.png / X.scale-200.png etc.

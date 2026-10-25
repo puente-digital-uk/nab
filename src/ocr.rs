@@ -22,6 +22,11 @@ pub static REPORTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32:
 static READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 const MAX_READS: usize = 2;
 
+/// Both reads a person can have going at once are in flight.
+pub fn busy() -> bool {
+    READS.load(std::sync::atomic::Ordering::SeqCst) >= MAX_READS
+}
+
 /// Read an area in the background, then hand the result to the UI thread (which owns the clipboard).
 /// `fallback` is what the screen scan already found there, used if the closer read finds nothing.
 pub fn spawn(bgra: Vec<u8>, w: u32, h: u32, fallback: Option<Grab>) {
@@ -73,20 +78,27 @@ pub fn summary(g: &Grab) -> (String, String) {
     }
 }
 
-/// Runs on the UI thread: copy and notify.
+/// Runs on the UI thread: copy and notify. A closed module (see `ext`) may take the grab over
+/// instead; with none installed the clipboard path below is the only one there is.
 pub fn report(lp: LPARAM) {
     let Some(res) = crate::mailbox::take::<Outcome>(crate::WM_OCR_DONE, lp) else { return };
     #[cfg(test)]
     REPORTS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let res = res.and_then(|g| {
-        let html = g.table.as_deref().map(logic::html_table);
-        sys::set_clipboard(&g.text, html.as_deref()).map(|_| g)
+    let res = res.and_then(|g| match crate::ext::pro().deliver(&g) {
+        Some(handled) => handled.map(|h| (g, Some(h))),
+        None => {
+            let html = g.table.as_deref().map(logic::html_table);
+            sys::set_clipboard(&g.text, html.as_deref()).map(|_| (g, None))
+        }
     });
     match res {
-        Ok(g) => {
+        Ok((g, handled)) => {
             sys::record_nab(g.table.is_some());
             crate::home::refresh();
-            let (title, body) = summary(&g);
+            let (title, body) = match handled {
+                Some(h) => (h.title, h.body),
+                None => summary(&g),
+            };
             sys::tray(NIM_MODIFY, Some((&title, &body)));
         }
         Err(e) => sys::tray(NIM_MODIFY, Some(("Nab", &e))),
@@ -184,14 +196,17 @@ fn percents_by_line(words: &mut [Word]) {
     }
 }
 
-/// The same, down each column of a table.
-fn percents_by_column(g: &mut Grab) {
+/// Down each column of a table: the same percentage fix, plus the two number repairs that need
+/// the column for evidence — a thousands separator misread ("1,533" as "1.533") and a decimal
+/// point lost in a scan ("12.4" as "12 4").
+fn columns_cleaned(g: &mut Grab) {
     let Some(rows) = g.table.as_mut() else { return };
     let cols = rows.iter().map(Vec::len).max().unwrap_or(0);
     let mut changed = false;
     for c in 0..cols {
         let mut col: Vec<String> = rows.iter().map(|r| r.get(c).cloned().unwrap_or_default()).collect();
-        if logic::fix_percents(&mut col) {
+        let fixed = logic::fix_percents(&mut col) | logic::fix_separators(&mut col) | logic::fix_lost_points(&mut col);
+        if fixed {
             changed = true;
             for (r, cell) in rows.iter_mut().zip(col) {
                 if let Some(slot) = r.get_mut(c) {
@@ -213,7 +228,7 @@ pub fn words(bgra: &[u8], w: u32, h: u32) -> Result<Vec<Word>> {
 /// Read a selected area carefully: a table if it's laid out as one (when `tables`), otherwise clean paragraphs.
 pub fn read(bgra: &[u8], w: u32, h: u32, tables: bool) -> Result<Grab> {
     let mut g = blocks::render(&words_with(bgra, w, h, logic::scale_factor)?, tables);
-    percents_by_column(&mut g);
+    columns_cleaned(&mut g);
     Ok(g)
 }
 
@@ -563,17 +578,26 @@ mod tests {
     }
 
     #[test]
-    fn misread_percent_fixed_down_a_column_and_in_the_pasted_text() {
+    fn numbers_fixed_down_a_column_and_in_the_pasted_text() {
         let row = |c: &[&str]| c.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         let rows = vec![row(&["Region", "Growth", "Score"]), row(&["North", "12%", "150/0"]), row(&["West", "90/0", "20/1"])];
         let mut g = Grab { text: blocks::tsv(&rows), table: Some(rows) };
-        percents_by_column(&mut g);
+        columns_cleaned(&mut g);
         assert_eq!(g.text, "Region\tGrowth\tScore\nNorth\t12%\t150/0\nWest\t9%\t20/1");
         assert_eq!(g.table.as_ref().map(|t| t[2][1].as_str()), Some("9%"));
         // Not a table: nothing to do.
         let mut plain = Grab { text: "90/0".into(), table: None };
-        percents_by_column(&mut plain);
+        columns_cleaned(&mut plain);
         assert_eq!(plain.text, "90/0");
+
+        // The number repairs run down the same columns, and the pasted text is rebuilt with them.
+        // Two commas outvote the one dot (one each would be no evidence either way).
+        let rows = vec![row(&["District", "Mains", "Losses"]), row(&["Eastbrook", "1,284", "12 4"]), row(&["Pinner Reach", "1.533", "15.6"]), row(&["Oldcastle", "968", "9.2"]), row(&["Ashford", "2,047", "11.8"])];
+        let mut g = Grab { text: blocks::tsv(&rows), table: Some(rows) };
+        columns_cleaned(&mut g);
+        let t = g.table.as_ref().unwrap();
+        assert_eq!((t[2][1].as_str(), t[1][2].as_str()), ("1,533", "12.4"));
+        assert!(g.text.contains("Eastbrook\t1,284\t12.4"), "{}", g.text);
     }
 
     #[test]

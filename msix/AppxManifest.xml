@@ -2,7 +2,9 @@
 <!--
   Template: msix\build.ps1 fills in the {{...}} placeholders.
   Identity Name / Publisher / PublisherDisplayName must match what Partner Center shows under
-  Product management > Product identity for the "Nab" name reservation (see msix\STORE.md).
+  Product management > Product identity for the name reservation (see msix\STORE.md).
+  Properties/DisplayName is the Store listing's name and must be exactly the reserved name
+  ("Nab" was taken); the Start menu, tile and startup task keep the short name, Nab.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -14,7 +16,7 @@
   <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>Nab</DisplayName>
+    <DisplayName>{{STORE_NAME}}</DisplayName>
     <PublisherDisplayName>{{PUBLISHER_DISPLAY}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <Description>Copy text from anything on your screen. Hold Ctrl+Shift and click on any text, or drag a box. Offline, using the OCR built into Windows.</Description>

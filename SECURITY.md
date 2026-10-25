@@ -8,7 +8,7 @@ Nab reads your screen and writes to your clipboard, so we take reports seriously
 
 - Anything that lets another process on the same PC crash Nab, read what it captured, or make it copy something the user didn't choose.
 - Anything that makes Nab send data off the machine (it never should).
-- Problems in the release pipeline: a published binary that doesn't match the tagged source.
+- Problems in the release pipeline: a published GitHub binary that doesn't match the tagged source. (The Microsoft Store build also contains the closed Nab Pro module; it is built privately from a public tag plus that module, and signed by Microsoft.)
 
 ## What's checked, automatically
 

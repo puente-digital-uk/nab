@@ -8,7 +8,16 @@
 - **Clipboard.** Nab writes to the clipboard when you copy something. It never reads the clipboard. Whatever you copy is then subject to your own Windows settings: Clipboard History and cloud clipboard sync apply to it like to any other copy.
 - **Notifications.** The "Copied …" notification shows the first 180 characters of what you copied. Windows keeps notifications in Notification Centre until you dismiss them and may show them on the lock screen, so treat that preview like the clipboard itself: don't nab a password or a one-time code on a PC you share, or clear the notification afterwards.
 - **Settings.** Your shortcuts, the Start with Windows choice and the time-saved counter (a number of seconds, nabs and steps) are stored in the Windows registry under `HKEY_CURRENT_USER\Software\PuenteDigital\Nab`. Deleting that key resets Nab. The Microsoft Store version keeps them in the app's own storage, which Windows removes when you uninstall.
-- **Network.** Nab makes no network connections. It has no account, no update check, no analytics, no crash reporting and no telemetry. The only time anything opens a browser is when you click a link in Nab's own window (this project's page, Puente Digital's site or Buy me a coffee), and that just opens the link in your default browser.
+- **Network.** The free Nab makes no network connections. It has no account, no update check, no analytics, no crash reporting and no telemetry. The only time anything opens a browser is when you click a link in Nab's own window (this project's page, Puente Digital's site or Buy me a coffee), and that just opens the link in your default browser.
+
+## Nab Pro (optional paid add-on, Microsoft Store only)
+
+Nab Pro is a separate, closed-source module. It changes nothing above for the free tool, and adds only this:
+
+- **Your licence.** Pro asks Windows (the Microsoft Store licensing service) whether you own it. Nab itself opens no connection; Windows may contact Microsoft's Store to answer, under Microsoft's own privacy terms. Nothing else is sent, and if the answer can't be had Nab simply stays the free tool.
+- **Appended grabs.** Append mode keeps what you grab in memory only, until you save it, clear it or quit Nab. Nothing is written to disk unless you choose Save as CSV or Excel, and then only to the file you choose. Like any clipboard copy, the appended text is on the clipboard.
+- **Saved regions.** A saved region is a name and four screen coordinates, kept in the same registry key as your other settings. The text inside a region is never stored.
+- No account, no analytics, no crash reporting, no telemetry.
 
 ## What we collect
 

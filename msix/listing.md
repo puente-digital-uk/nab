@@ -4,7 +4,7 @@ Paste these into Partner Center → Store listing (English (United Kingdom); add
 
 ## Product name
 
-Nab
+Nab: Copy Text from Screen  (the reserved name; "Nab" was taken. The app itself is still called Nab in the Start menu and everywhere else.)
 
 ## Short title (if asked)
 
@@ -25,7 +25,9 @@ Hold Ctrl+Shift and click on any text on your screen. Nab works out where that p
 • Tiny: one small app that sits quietly in the tray. Start it with Windows and the shortcut is always there.
 • Both shortcuts can be changed. Prefer the keyboard? Alt+Space freezes the screen; click a block or drag a box.
 
-Free and open source (MIT). Made by Puente Digital.
+Nab is free to use, and everything above is free permanently. An optional one-off purchase, Nab Pro, adds append mode (several grabs into one paste), saving to CSV or Excel, and saved screen regions you can re-grab with one hotkey. The free core is open source (MIT) at github.com/puente-digital-uk/nab; the Pro module is closed source. Made by Puente Digital.
+
+In-app purchase: Nab Pro, one-off (price shown in the Store).
 
 ## What's new (first submission)
 
@@ -41,7 +43,8 @@ OCR, copy text, screenshot to text, extract text, image to text, PDF table, clip
 
 ## Additional licence terms
 
-MIT licence: https://github.com/puente-digital-uk/nab/blob/main/LICENSE
+The free core is MIT licensed: https://github.com/puente-digital-uk/nab/blob/main/LICENSE
+The Nab Pro module is proprietary and licensed under the Microsoft Store standard application licence terms. Third-party notices: the Microsoft `windows` crate (MIT or Apache-2.0).
 
 ## Developer / support
 
@@ -56,3 +59,5 @@ Nab is a desktop tray app. It needs runFullTrust for a global hotkey (RegisterHo
 To test: launch Nab; its window opens and it adds a tray icon. Open any document or web page, hold Ctrl+Shift and left-click on a paragraph: the screen dims for a moment, the paragraph flashes green, a notification says "Copied N characters", and Ctrl+V pastes the text. Hold Ctrl+Shift and drag a box over a table, then paste into Excel: it arrives as rows and columns. Alt+Space opens the same selection screen from the keyboard; Esc closes it. "Start with Windows" in the window toggles the package's startup task.
 
 The screen image is processed in memory with Windows.Media.Ocr and discarded. Settings are stored in the app's registry hive.
+
+In-app purchase (optional): "Nab Pro", a durable add-on with product ID nab_pro. The app checks its licence with Windows.Services.Store (StoreContext.GetAppLicenseAsync) and, only when the user presses the button on the Nab Pro card in the app window, offers the purchase with StoreContext.RequestPurchaseAsync. If the licence can't be checked, the app behaves as the free version. Nab Pro features appear in the tray menu under "Nab Pro" once purchased (append mode, Save as CSV/Excel, saved regions).
