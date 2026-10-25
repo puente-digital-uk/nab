@@ -2,9 +2,11 @@
 
 All notable changes to Nab. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
-## [0.2.0] – 2026-10-25 (beta)
+## [0.2.1] – 2026-10-25 (beta)
 
 The first release for the Microsoft Store. Tables from scanned sources come back with their numbers intact, the download is easier to verify, and there is room for an optional, separate add-on.
+
+The `v0.2.0` tag was never released: its release build failed on a test whose "blank" click landed on the build runner's console. That test now covers the whole screen with its own blank window. Nothing in the app differs from what `v0.2.0` would have shipped.
 
 ### Fixed
 - Tables: numbers misread at low resolution are repaired using the rest of the column as evidence, never a cell alone: `1,533` read as `1.533`, and `12.4` read as `12 4`.
