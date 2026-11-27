@@ -10,3 +10,9 @@ updates:
     schedule:
       interval: weekly
     labels: [dependencies]
+    groups:
+      # Steps that must move together arrive in one pull request. The CodeQL steps refuse to run on mixed versions.
+      codeql-action:
+        patterns: ["github/codeql-action*"]
+      artifact-actions:
+        patterns: ["actions/upload-artifact", "actions/download-artifact"]
